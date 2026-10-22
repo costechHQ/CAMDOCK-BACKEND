@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Camdock International School — Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-950:#0D0F2B;
+    --navy-900:#12174A;
+    --navy-800:#1B2168;
+    --navy-700:#262C6B;
+    --navy-600:#333B8C;
+    --silver-100:#F2F2F5;
+    --silver-200:#E4E5EC;
+    --silver-300:#C9CBDA;
+    --silver-500:#9698AE;
+    --gold-500:#B8934C;
+    --gold-600:#9C7A3B;
+    --paper:#FBFAF6;
+    --surface:#FFFFFF;
+    --ink-900:#181A2B;
+    --ink-600:#4C4F63;
+    --ink-400:#7A7D91;
+    --line:#E3E1DA;
+    --success-bg:#EAF4EE;
+    --success-ink:#276847;
+    --danger-bg:#FBEAE8;
+    --danger-ink:#A83A2F;
+    --radius-s:3px;
+    --radius-m:6px;
+    --shadow-1: 0 1px 2px rgba(13,15,43,0.06), 0 1px 1px rgba(13,15,43,0.04);
+    --shadow-2: 0 8px 28px rgba(13,15,43,0.16);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0B0C1E;
+      --surface:#12142C;
+      --ink-900:#F1F1F5;
+      --ink-600:#C3C4D2;
+      --ink-400:#8B8DA3;
+      --line:#282A44;
+      --silver-100:#171933;
+      --silver-200:#1E2140;
+      --success-bg:#12281F;
+      --success-ink:#7FD9A6;
+      --danger-bg:#2C1616;
+      --danger-ink:#EA9B92;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0B0C1E;
+    --surface:#12142C;
+    --ink-900:#F1F1F5;
+    --ink-600:#C3C4D2;
+    --ink-400:#8B8DA3;
+    --line:#282A44;
+    --silver-100:#171933;
+    --silver-200:#1E2140;
+    --success-bg:#12281F;
+    --success-ink:#7FD9A6;
+    --danger-bg:#2C1616;
+    --danger-ink:#EA9B92;
+  }
+  html{scroll-padding-top: env(safe-area-inset-top, 0px); height:100%;}
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100%; background:var(--paper); color:var(--ink-900);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{ font-family:'Fraunces',Georgia,serif; letter-spacing:0.01em; }
+  img,svg{max-width:100%;}
+  button{font-family:inherit;}
+  a{color:inherit;}
+
+  /* ---------- utility ---------- */
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px;}
+  .hidden{display:none !important;}
+  .scrollx{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .muted{color:var(--ink-400);}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px; cursor:pointer;
+    border:1px solid transparent; border-radius:var(--radius-s);
+    padding:11px 20px; font-size:14.5px; font-weight:600; font-family:'Inter';
+    transition:transform .12s ease, background .15s ease, border-color .15s ease;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--navy-800); color:#fff;}
+  .btn-primary:hover{background:var(--navy-900);}
+  .btn-gold{background:var(--gold-500); color:#241a05;}
+  .btn-gold:hover{background:var(--gold-600);}
+  .btn-ghost{background:transparent; border-color:var(--line); color:var(--ink-900);}
+  .btn-ghost:hover{border-color:var(--silver-500);}
+  .btn-outline-invert{background:transparent; border-color:rgba(255,255,255,.45); color:#fff;}
+  .btn-outline-invert:hover{background:rgba(255,255,255,.1);}
+  .btn-sm{padding:7px 13px; font-size:13px;}
+  .btn-danger{background:transparent; border-color:var(--danger-ink); color:var(--danger-ink);}
+
+  .field-label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-600); margin-bottom:6px;}
+  select,input[type=text],input[type=number],input[type=date]{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-s);
+    background:var(--surface); color:var(--ink-900); font-size:14px; font-family:inherit;
+  }
+  select:focus,input:focus{outline:2px solid var(--navy-600); outline-offset:1px;}
+
+  /* ---------- crest ---------- */
+  .crest svg{display:block;}
+
+  /* ================= PUBLIC HOME ================= */
+  #view-home{display:none;}
+  header.site-header{
+    position:sticky; top:0; z-index:40; background:var(--navy-950);
+    padding-top: env(safe-area-inset-top,0px);
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  .site-header .bar{display:flex; align-items:center; justify-content:space-between; height:72px;}
+  .brand{display:flex; align-items:center; gap:12px; color:#fff; text-decoration:none;}
+  .brand-name{line-height:1.15;}
+  .brand-name .top{font-family:'Fraunces'; font-weight:600; font-size:16.5px;}
+  .brand-name .bottom{font-size:10.5px; letter-spacing:.14em; color:var(--silver-300);}
+  nav.top-nav{display:flex; align-items:center; gap:30px;}
+  nav.top-nav a{color:var(--silver-200); text-decoration:none; font-size:14px; font-weight:500;}
+  nav.top-nav a:hover{color:#fff;}
+
+  .hero{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(184,147,76,.16), transparent 60%),
+      linear-gradient(180deg, var(--navy-950) 0%, var(--navy-900) 60%, var(--navy-800) 100%);
+    color:#fff; padding:78px 0 96px; position:relative; overflow:hidden;
+  }
+  .hero .wrap{display:grid; grid-template-columns:1.15fr 0.85fr; gap:56px; align-items:center;}
+  .hero .eyebrow-rule{display:flex; align-items:center; gap:14px; margin-bottom:22px;}
+  .hero .eyebrow-rule .ln{height:1px; width:44px; background:var(--gold-500);}
+  .hero .eyebrow-rule span{font-size:13px; letter-spacing:.12em; color:var(--gold-500); font-weight:600;}
+  .hero h1{font-size:clamp(34px,4.6vw,54px); line-height:1.06; margin:0 0 18px; font-weight:600;}
+  .hero p.lede{font-size:17px; line-height:1.6; color:var(--silver-200); max-width:46ch; margin:0 0 30px;}
+  .hero .cta-row{display:flex; gap:14px; flex-wrap:wrap;}
+  .hero-crest-box{display:flex; align-items:center; justify-content:center;}
+
+  section.pillars{padding:80px 0; background:var(--paper);}
+  .pillars-head{max-width:56ch; margin-bottom:44px;}
+  .pillars-head .kicker{color:var(--gold-600); font-weight:600; font-size:13px; letter-spacing:.1em; margin-bottom:10px;}
+  .pillars-head h2{font-size:30px; margin:0 0 12px; font-weight:600;}
+  .pillars-head p{color:var(--ink-600); line-height:1.6; margin:0; font-size:15.5px;}
+
+  .pillar-list{border-top:1px solid var(--line);}
+  .pillar{display:grid; grid-template-columns:56px 1fr; gap:22px; padding:28px 0; border-bottom:1px solid var(--line);}
+  .pillar .icon-ring{
+    width:52px; height:52px; border-radius:50%; background:var(--navy-900);
+    display:flex; align-items:center; justify-content:center; color:var(--silver-200);
+  }
+  .pillar h3{margin:2px 0 8px; font-size:19px; font-weight:600;}
+  .pillar p{margin:0; color:var(--ink-600); line-height:1.62; font-size:15px; max-width:66ch;}
+  .pillar .motto-text{font-family:'Fraunces'; font-style:italic; font-size:21px; color:var(--navy-800); font-weight:500;}
+  :root[data-theme="dark"] .pillar .motto-text, @media (prefers-color-scheme:dark){ .pillar .motto-text{color:var(--gold-500);} }
+
+  section.stats-strip{background:var(--navy-900); color:#fff; padding:44px 0;}
+  .stats-strip .wrap{display:grid; grid-template-columns:repeat(4,1fr); gap:20px;}
+  .stat-item .num{font-family:'Fraunces'; font-size:32px; font-weight:600; color:var(--gold-500);}
+  .stat-item .lbl{font-size:13px; color:var(--silver-300); margin-top:4px;}
+
+  section.gate{padding:84px 0 100px;}
+  .gate-box{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m);
+    padding:48px; display:grid; grid-template-columns:1fr auto; gap:32px; align-items:center;
+    box-shadow:var(--shadow-1);
+  }
+  .gate-box h2{margin:0 0 8px; font-size:24px;}
+  .gate-box p{margin:0; color:var(--ink-600); font-size:15px;}
+
+  footer.site-footer{background:var(--navy-950); color:var(--silver-300); padding:34px 0; font-size:13px;}
+  footer.site-footer .wrap{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;}
+
+  /* ================= LOGIN ================= */
+  #view-login{min-height:100%; display:none; align-items:center; justify-content:center; background:
+      radial-gradient(ellipse 900px 500px at 85% 0%, rgba(184,147,76,.12), transparent 60%), var(--navy-950);
+    padding:60px 20px;}
+  .login-card{width:100%; max-width:960px; background:var(--surface); border-radius:8px; overflow:hidden; box-shadow:var(--shadow-2); display:grid; grid-template-columns:1fr 1fr;}
+  .login-side{background:var(--navy-900); color:#fff; padding:48px 40px; display:flex; flex-direction:column; justify-content:space-between;}
+  .login-side h2{font-size:24px; margin:22px 0 10px; font-weight:600;}
+  .login-side p{color:var(--silver-300); font-size:14px; line-height:1.6;}
+  .login-main{padding:48px 42px;}
+  .login-main h3{margin:0 0 4px; font-size:20px;}
+  .login-main .sub{color:var(--ink-400); font-size:13.5px; margin:0 0 26px;}
+  .role-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:24px;}
+  .role-btn{border:1px solid var(--line); border-radius:var(--radius-s); padding:14px 8px; text-align:center; cursor:pointer; background:var(--surface); transition:.15s;}
+  .role-btn svg{margin-bottom:8px;}
+  .role-btn span{display:block; font-size:12.5px; font-weight:600;}
+  .role-btn.active{border-color:var(--navy-800); background:var(--silver-100); box-shadow:0 0 0 1px var(--navy-800) inset;}
+  .login-form-row{margin-bottom:16px;}
+  .demo-note{font-size:12px; color:var(--ink-400); margin-top:14px; line-height:1.6; border-top:1px solid var(--line); padding-top:14px;}
+  .back-link{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--silver-300); text-decoration:none; margin-bottom:0;}
+
+  /* ================= PORTAL SHELL ================= */
+  #view-portal{display:none; min-height:100%; background:var(--paper);}
+  .portal-shell{display:grid; grid-template-columns:236px 1fr; min-height:100vh;}
+  .rail{background:var(--navy-950); color:#fff; padding:22px 16px; display:flex; flex-direction:column;
+    padding-top: calc(22px + env(safe-area-inset-top,0px));}
+  .rail-brand{display:flex; align-items:center; gap:10px; padding:6px 8px 22px; border-bottom:1px solid rgba(255,255,255,.08); margin-bottom:16px;}
+  .rail-brand .brand-name .top{font-size:14px;}
+  .rail-nav{display:flex; flex-direction:column; gap:2px; flex:1;}
+  .rail-nav button{
+    display:flex; align-items:center; gap:12px; text-align:left; background:none; border:none; color:var(--silver-300);
+    padding:11px 12px; border-radius:var(--radius-s); font-size:14px; cursor:pointer; font-weight:500;
+  }
+  .rail-nav button:hover{background:rgba(255,255,255,.06); color:#fff;}
+  .rail-nav button.active{background:var(--navy-800); color:#fff;}
+  .rail-nav button svg{flex-shrink:0; opacity:.85;}
+  .rail-foot{border-top:1px solid rgba(255,255,255,.08); padding-top:14px; margin-top:14px;}
+  .rail-user{display:flex; align-items:center; gap:10px; padding:8px; margin-bottom:8px;}
+  .rail-user .av{width:32px; height:32px; border-radius:50%; background:var(--gold-500); color:#241a05; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;}
+  .rail-user .nm{font-size:13px; font-weight:600; line-height:1.3;}
+  .rail-user .rl{font-size:11.5px; color:var(--silver-500);}
+
+  .content{padding:32px 36px 60px; max-width:1180px; padding-top: calc(32px + env(safe-area-inset-top,0px));}
+  .content-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:26px; gap:16px; flex-wrap:wrap;}
+  .content-head h1{font-size:26px; margin:0 0 6px; font-weight:600;}
+  .content-head p{margin:0; color:var(--ink-600); font-size:14px;}
+
+  .kpi-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:30px;}
+  .kpi{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:18px 20px;}
+  .kpi .lbl{font-size:12.5px; color:var(--ink-400); font-weight:600; margin-bottom:8px;}
+  .kpi .val{font-family:'Fraunces'; font-size:27px; font-weight:600;}
+  .kpi .sub{font-size:12px; color:var(--ink-400); margin-top:4px;}
+
+  .panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); margin-bottom:24px;}
+  .panel-head{display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--line); gap:14px; flex-wrap:wrap;}
+  .panel-head h2{font-size:16.5px; margin:0; font-weight:600;}
+  .panel-body{padding:20px 22px;}
+  .toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+  .toolbar select, .toolbar input{width:auto; min-width:150px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13.6px;}
+  thead th{ text-align:left; font-size:11.5px; letter-spacing:.04em; color:var(--ink-400); font-weight:600;
+    padding:9px 12px; border-bottom:1px solid var(--line); white-space:nowrap;}
+  tbody td{padding:11px 12px; border-bottom:1px solid var(--line); color:var(--ink-900); vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:var(--silver-100);}
+  td input[type=number]{width:64px; padding:6px 8px; text-align:center;}
+  .avg-row td{font-weight:700; background:var(--silver-100);}
+
+  .pill{display:inline-flex; align-items:center; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; letter-spacing:.02em;}
+  .pill-paid{background:var(--success-bg); color:var(--success-ink);}
+  .pill-due{background:var(--danger-bg); color:var(--danger-ink);}
+  .pill-partial{background:#FCF3E3; color:#8A5A16;}
+  :root[data-theme="dark"] .pill-partial, @media (prefers-color-scheme:dark){.pill-partial{background:#332711; color:#E8B968;}}
+  .grade-badge{display:inline-flex; width:26px; height:26px; align-items:center; justify-content:center; border-radius:4px; font-weight:700; font-size:11.5px; background:var(--navy-900); color:#fff;}
+
+  .avatar-sm{width:30px; height:30px; border-radius:50%; background:var(--navy-800); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:700; margin-right:9px; vertical-align:middle;}
+  .name-cell{display:flex; align-items:center;}
+
+  .empty-state{text-align:center; padding:50px 20px; color:var(--ink-400);}
+  .empty-state svg{margin-bottom:14px; opacity:.5;}
+
+  /* modal */
+  .modal-backdrop{position:fixed; inset:0; background:rgba(10,11,26,.55); z-index:80; display:none; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto;}
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--surface); width:100%; max-width:640px; border-radius:8px; box-shadow:var(--shadow-2); margin:auto;}
+  .modal-head{display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--line);}
+  .modal-head h3{margin:0; font-size:17px;}
+  .modal-close{background:none; border:none; cursor:pointer; color:var(--ink-400); padding:4px;}
+  .modal-body{padding:22px;}
+  .modal-foot{padding:16px 22px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px;}
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+
+  /* receipt */
+  .receipt-sheet{background:#fff; color:#181A2B; width:100%; max-width:560px; margin:0 auto; border:1px solid #ddd; padding:36px;}
+  .receipt-top{display:flex; align-items:center; gap:14px; border-bottom:2px solid var(--navy-800); padding-bottom:16px; margin-bottom:18px;}
+  .receipt-top .rt-name{font-family:'Fraunces'; font-weight:600; font-size:18px; color:var(--navy-900);}
+  .receipt-top .rt-addr{font-size:11.5px; color:#6a6c7f;}
+  .receipt-kind{text-align:center; font-family:'Fraunces'; font-size:15px; letter-spacing:.06em; color:var(--gold-600); margin-bottom:20px; font-weight:600;}
+  .receipt-meta{display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; font-size:13px; margin-bottom:18px;}
+  .receipt-meta div span{display:block;}
+  .receipt-meta .k{color:#8a8c9c; font-size:11px;}
+  .receipt-table{width:100%; border-collapse:collapse; margin-bottom:18px;}
+  .receipt-table th{text-align:left; font-size:11px; color:#8a8c9c; border-bottom:1px solid #ddd; padding:6px 0;}
+  .receipt-table td{padding:10px 0; border-bottom:1px solid #eee; font-size:13.5px;}
+  .receipt-total{display:flex; justify-content:space-between; font-family:'Fraunces'; font-size:17px; font-weight:600; padding-top:8px;}
+  .receipt-foot{margin-top:30px; display:flex; justify-content:space-between; align-items:flex-end;}
+  .receipt-foot .sig{border-top:1px solid #999; width:150px; text-align:center; font-size:11px; padding-top:4px; color:#6a6c7f;}
+  .receipt-status{font-size:11px; letter-spacing:.08em; font-weight:700; padding:4px 10px; border-radius:3px;}
+
+  @media print{
+    body *{visibility:hidden;}
+    #print-area, #print-area *{visibility:visible;}
+    #print-area{position:absolute; left:0; top:0; width:100%;}
+    .modal-backdrop{position:absolute; background:none; padding:0;}
+  }
+
+  @media (max-width:900px){
+    .hero .wrap{grid-template-columns:1fr;}
+    .hero-crest-box{order:-1;}
+    .stats-strip .wrap{grid-template-columns:repeat(2,1fr);}
+    .gate-box{grid-template-columns:1fr; text-align:center;}
+    .login-card{grid-template-columns:1fr;}
+    .login-side{padding:34px 30px;}
+    .portal-shell{grid-template-columns:1fr;}
+    .rail{position:sticky; top:0; z-index:30; flex-direction:row; align-items:center; padding:12px 14px; padding-top: calc(12px + env(safe-area-inset-top,0px));}
+    .rail-brand{border:none; padding:0; margin:0; margin-right:auto;}
+    .rail-nav{flex-direction:row; overflow-x:auto; gap:4px;}
+    .rail-nav button span{display:none;}
+    .rail-foot{display:none;}
+    .content{padding:22px 16px 50px;}
+    .kpi-grid{grid-template-columns:1fr 1fr;}
+    .form-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width:640px){
+    nav.top-nav{display:none;}
+    .role-grid{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ ICON LIBRARY (inline, reused) ============ -->
+<template id="ic-target"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg></template>
+<template id="ic-eye"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></template>
+<template id="ic-gem"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h12l3 5-9 13L3 8Z"/><path d="M3 8h18M9 3l-2 5 5 13 5-13-2-5M9 3l3 5-3 5M15 3l-3 5 3 5"/></svg></template>
+<template id="ic-grid"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></template>
+<template id="ic-users"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.6-4 3-6 6.5-6s5.9 2 6.5 6"/><circle cx="17.5" cy="8.5" r="2.5"/><path d="M15.8 14.2c2.7.3 4.4 2.2 4.9 5.3"/></svg></template>
+<template id="ic-book"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5C4.7 20 4 19.3 4 18.5Z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5Z"/></svg></template>
+<template id="ic-cash"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v0M18 15v0"/></svg></template>
+<template id="ic-chalk"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="12" rx="1.4"/><path d="M8 20h8M12 16v4"/></svg></template>
+<template id="ic-child"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="6" r="3"/><path d="M6 21c0-4.5 2.7-7 6-7s6 2.5 6 7"/></svg></template>
+<template id="ic-receipt"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h12v18l-2.5-1.5L13 21l-2.5-1.5L8 21l-2-1.5Z"/><path d="M9 8h6M9 12h6"/></svg></template>
+<template id="ic-out"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></template>
+<template id="ic-shield-sm"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V5Z"/></svg></template>
+<template id="ic-close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg></template>
+<template id="ic-print"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M6 14h12v7H6Z"/></svg></template>
+<template id="ic-plus"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></template>
+
+<!-- ============================= HOME (public) ============================= -->
+<div id="view-home">
+  <header class="site-header">
+    <div class="wrap bar">
+      <a href="#" class="brand" onclick="return false;">
+        <span class="crest" data-crest="28"></span>
+        <span class="brand-name"><span class="top">Camdock International</span><br><span class="bottom">SCHOOL &nbsp;·&nbsp; EST. 2026</span></span>
+      </a>
+      <nav class="top-nav">
+        <a href="#about">Mission &amp; Vision</a>
+        <a href="#stats">The School</a>
+        <a href="#portal">Portal</a>
+      </nav>
+      <button class="btn btn-gold btn-sm" onclick="goTo('login')">Portal Login</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow-rule"><div class="ln"></div><span>CAMDOCK INTERNATIONAL SCHOOL LTD</span></div>
+        <h1>One portal for every result, receipt and record.</h1>
+        <p class="lede">A single school management portal for administrators, teachers and parents — student records, results and class averages, teacher directory, and fee receipts, all in one place.</p>
+        <div class="cta-row">
+          <button class="btn btn-gold" onclick="goTo('login')">Enter the Portal</button>
+          <a href="#about" class="btn btn-outline-invert">Our mission &amp; vision</a>
+        </div>
+      </div>
+      <div class="hero-crest-box"><span class="crest" data-crest="220"></span></div>
+    </div>
+  </section>
+
+  <section class="pillars" id="about">
+    <div class="wrap">
+      <div class="pillars-head">
+        <div class="kicker">WHO WE ARE</div>
+        <h2>Empowering minds, shaping futures.</h2>
+      </div>
+      <div class="pillar-list">
+        <div class="pillar">
+          <div class="icon-ring" id="ic-slot-target"></div>
+          <div><h3>Mission</h3><p>Ensuring a transformative learning environment where every child is equipped with quality education, sound values, practical life skills, and a passion for lifelong learning, enabling them to become confident, responsible, and impactful leaders in society.</p></div>
+        </div>
+        <div class="pillar">
+          <div class="icon-ring" id="ic-slot-eye"></div>
+          <div><h3>Vision</h3><p>To be the citadel of academic excellence where future leaders who are innovative, morally grounded with problem-solving knowledge and skills are nurtured and shaped to become world builders.</p></div>
+        </div>
+        <div class="pillar">
+          <div class="icon-ring" id="ic-slot-gem"></div>
+          <div><h3>Motto</h3><p class="motto-text">Empowering minds, shaping futures</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats-strip" id="stats">
+    <div class="wrap">
+      <div class="stat-item"><div class="num" id="stat-students">—</div><div class="lbl">Students enrolled</div></div>
+      <div class="stat-item"><div class="num" id="stat-teachers">—</div><div class="lbl">Teaching staff</div></div>
+      <div class="stat-item"><div class="num" id="stat-classes">—</div><div class="lbl">Classes, Creche to SSS3</div></div>
+      <div class="stat-item"><div class="num">2026</div><div class="lbl">Founded</div></div>
+    </div>
+  </section>
+
+  <section class="gate" id="portal">
+    <div class="wrap">
+      <div class="gate-box">
+        <div>
+          <h2>Parents: check results and print receipts anytime.</h2>
+          <p>Sign in to view your child's results and class average, and print tuition, levy or exam-fee receipts on demand.</p>
+        </div>
+        <button class="btn btn-primary" onclick="goTo('login')">Go to Portal Login</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>© 2026 Camdock International School Ltd.</span>
+      <span>Port Harcourt, Rivers State, Nigeria</span>
+    </div>
+  </footer>
+</div>
+
+<!-- ============================= LOGIN ============================= -->
+<div id="view-login">
+  <div class="login-card">
+    <div class="login-side">
+      <div>
+        <a href="#" class="back-link" onclick="goTo('home');return false;">&larr; Back to site</a>
+        <span class="crest" data-crest="86" style="display:block;margin-top:18px;"></span>
+        <h2>Camdock&nbsp;International<br>Portal</h2>
+        <p>One sign-in gate, three views: administrators and teachers manage the school; parents check results and print receipts.</p>
+      </div>
+      <p style="font-size:11.5px;color:var(--silver-500);">Empowering minds, shaping futures.</p>
+    </div>
+    <div class="login-main">
+      <h3>Sign in</h3>
+      <p class="sub">Choose your role to continue.</p>
+      <div class="role-grid" id="role-grid"></div>
+      <div id="login-fields"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="attemptLogin()">Continue</button>
+      <p class="demo-note">This is a working prototype with sample data stored in your browser only — nothing here is sent anywhere. In production this gate would connect to the school's real student and accounts records.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= PORTAL SHELL ============================= -->
+<div id="view-portal">
+  <div class="portal-shell">
+    <aside class="rail">
+      <div class="rail-brand">
+        <span class="crest" data-crest="26"></span>
+        <div class="brand-name"><span class="top">Camdock</span></div>
+      </div>
+      <nav class="rail-nav" id="rail-nav"></nav>
+      <div class="rail-foot">
+        <div class="rail-user">
+          <div class="av" id="rail-av">A</div>
+          <div><div class="nm" id="rail-name">—</div><div class="rl" id="rail-role">—</div></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;color:var(--silver-200);border-color:rgba(255,255,255,.15);" onclick="logout()" id="btn-logout">
+          Sign out
+        </button>
+      </div>
+    </aside>
+    <main class="content" id="portal-content"></main>
+  </div>
+</div>
+
+<!-- ============================= MODALS ============================= -->
+<div class="modal-backdrop" id="modal-student">
+  <div class="modal">
+    <div class="modal-head"><h3>Add student</h3><button class="modal-close" onclick="closeModal('modal-student')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label class="field-label">Full name</label><input type="text" id="ns-name" placeholder="e.g. Chidera Nwosu"></div>
+        <div><label class="field-label">Class</label><select id="ns-class"></select></div>
+        <div><label class="field-label">Gender</label><select id="ns-gender"><option>Female</option><option>Male</option></select></div>
+        <div><label class="field-label">Guardian / parent name</label><input type="text" id="ns-guardian" placeholder="e.g. Mrs. Nwosu"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('modal-student')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewStudent()">Add student</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-teacher">
+  <div class="modal">
+    <div class="modal-head"><h3>Add teacher</h3><button class="modal-close" onclick="closeModal('modal-teacher')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div><label class="field-label">Full name</label><input type="text" id="nt-name" placeholder="e.g. Mr. Emeka Obi"></div>
+        <div><label class="field-label">Subject</label><input type="text" id="nt-subject" placeholder="e.g. Mathematics"></div>
+        <div><label class="field-label">Class(es) assigned</label><input type="text" id="nt-classes" placeholder="e.g. JSS1, JSS2"></div>
+        <div><label class="field-label">Phone</label><input type="text" id="nt-phone" placeholder="080..."></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('modal-teacher')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewTeacher()">Add teacher</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-payment">
+  <div class="modal">
+    <div class="modal-head"><h3>Record fee payment</h3><button class="modal-close" onclick="closeModal('modal-payment')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div style="grid-column:1/-1;"><label class="field-label">Student</label><select id="np-student"></select></div>
+        <div><label class="field-label">Fee type</label><select id="np-type">
+          <option>Tuition Fee</option><option>Development Levy</option><option>Examination Fee</option><option>PTA Levy</option><option>Uniform &amp; Materials</option>
+        </select></div>
+        <div><label class="field-label">Term</label><select id="np-term"><option>First Term</option><option>Second Term</option><option>Third Term</option></select></div>
+        <div><label class="field-label">Amount billed (₦)</label><input type="number" id="np-amount" placeholder="e.g. 85000"></div>
+        <div><label class="field-label">Amount paid (₦)</label><input type="number" id="np-paid" placeholder="e.g. 85000"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('modal-payment')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitPayment()">Save record</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-receipt">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-head"><h3>Receipt</h3><button class="modal-close" onclick="closeModal('modal-receipt')">&times;</button></div>
+    <div class="modal-body" style="background:var(--silver-100);">
+      <div id="print-area"><div class="receipt-sheet" id="receipt-sheet"></div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('modal-receipt')">Close</button>
+      <button class="btn btn-primary" onclick="window.print()"><span id="ic-slot-print"></span>&nbsp;Print receipt</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-report">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head"><h3>Result sheet</h3><button class="modal-close" onclick="closeModal('modal-report')">&times;</button></div>
+    <div class="modal-body" style="background:var(--silver-100);">
+      <div id="print-area-2"><div class="receipt-sheet" id="report-sheet" style="max-width:100%;"></div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('modal-report')">Close</button>
+      <button class="btn btn-primary" onclick="window.print()">Print result sheet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ======================================================================
+   ICON HELPERS
+====================================================================== */
+function icon(name){ const t=document.getElementById('ic-'+name); return t?t.innerHTML:''; }
+function paintStaticIcons(){
+  document.getElementById('ic-slot-target').innerHTML = icon('target');
+  document.getElementById('ic-slot-eye').innerHTML = icon('eye');
+  document.getElementById('ic-slot-gem').innerHTML = icon('gem');
+  document.getElementById('ic-slot-print').innerHTML = icon('print');
+  document.querySelectorAll('[data-crest]').forEach(el=>{
+    el.innerHTML = crestSVG(parseInt(el.getAttribute('data-crest')));
+  });
+}
+function crestSVG(size){
+  return `<svg width="${size}" height="${size*1.12}" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 3 L92 15 V52 C92 78 74 96 50 108 C26 96 8 78 8 52 V15 Z" fill="#12174A" stroke="#B8934C" stroke-width="1.6"/>
+    <path d="M50 10 L85 20 V52 C85 74 70 90 50 100 C30 90 15 74 15 52 V20 Z" fill="#C9CBDA" opacity="0.92"/>
+    <circle cx="50" cy="46" r="21" fill="#12174A"/>
+    <path d="M38 60 Q50 66 62 60 L62 66 Q50 72 38 66 Z" fill="#C9CBDA"/>
+    <path d="M36 40 h13 v16 q-6 -4 -13 -1 Z" fill="#F2F2F5"/>
+    <path d="M64 40 h-13 v16 q6 -4 13 -1 Z" fill="#F2F2F5"/>
+    <path d="M50 40 l9 -11 l3 3 l-9 11 z" fill="#F2F2F5"/>
+    <circle cx="30" cy="30" r="2" fill="#C9CBDA"/><circle cx="40" cy="24" r="2" fill="#C9CBDA"/>
+    <circle cx="60" cy="24" r="2" fill="#C9CBDA"/><circle cx="70" cy="30" r="2" fill="#C9CBDA"/>
+  </svg>`;
+}
+
+/* ======================================================================
+   DATA MODEL (seeded sample data, persisted to localStorage per browser)
+====================================================================== */
+const CLASSES = ["Nursery 1","Nursery 2","Primary 1","Primary 2","Primary 3","Primary 4","Primary 5","Primary 6","JSS 1","JSS 2","JSS 3","SSS 1","SSS 2","SSS 3"];
+const SUBJECTS_BY_LEVEL = {
+  primary:["Mathematics","English Language","Basic Science","Social Studies","Quantitative Reasoning"],
+  secondary:["Mathematics","English Language","Basic Science","Civic Education","Agricultural Science"]
+};
+function subjectsFor(cls){ return cls.startsWith("JSS")||cls.startsWith("SSS") ? SUBJECTS_BY_LEVEL.secondary : SUBJECTS_BY_LEVEL.primary; }
+
+const seedNames = ["Chidera Nwosu","Tamuno Wodi","Ifeoma Bassey","David Etim","Amaka Chukwu","Faith Briggs","Emeka Okoro","Blessing Amadi","Samuel Ekong","Praise Harry","Confidence Dan","Michael Obi"];
+
+function seedData(){
+  const students = seedNames.map((name,i)=>({
+    id:"S"+(1001+i), name, cls: CLASSES[(i*2+3)%CLASSES.length],
+    gender: i%2===0?"Female":"Male", guardian: "Mr./Mrs. "+name.split(" ")[1]
+  }));
+  const teachers = [
+    {id:"T01", name:"Mrs. Grace Amadi", subject:"Mathematics", classes:"JSS1, JSS2", phone:"0803 555 0101"},
+    {id:"T02", name:"Mr. Emeka Obi", subject:"English Language", classes:"Primary 5, Primary 6", phone:"0805 555 0102"},
+    {id:"T03", name:"Mrs. Ifeoma Bassey", subject:"Basic Science", classes:"JSS1, JSS3", phone:"0807 555 0103"},
+    {id:"T04", name:"Mr. Tamuno George", subject:"Social Studies", classes:"Primary 3, Primary 4", phone:"0809 555 0104"},
+  ];
+  const results = {}; const terms=["First Term","Second Term","Third Term"];
+  students.forEach(s=>{
+    results[s.id]={};
+    terms.forEach(t=>{
+      const subs = subjectsFor(s.cls); const rec={};
+      subs.forEach(sub=>{ rec[sub] = 45 + Math.floor(Math.random()*50); });
+      results[s.id][t]=rec;
+    });
+  });
+  const fees = {};
+  students.forEach((s,i)=>{
+    fees[s.id]=[
+      {id:"R"+s.id+"1", type:"Tuition Fee", term:"First Term", amount:85000, paid: i%3===0?60000:85000, date:"2026-09-12"},
+      {id:"R"+s.id+"2", type:"Development Levy", term:"First Term", amount:12000, paid:12000, date:"2026-09-12"},
+      {id:"R"+s.id+"3", type:"Examination Fee", term:"First Term", amount:6000, paid: i%4===0?0:6000, date:"2026-09-20"},
+    ];
+  });
+  return {students, teachers, results, fees};
+}
+
+let DB;
+function loadDB(){
+  try{
+    const raw = localStorage.getItem('camdock_db_v1');
+    if(raw){ DB = JSON.parse(raw); return; }
+  }catch(e){ console.warn('storage read failed', e); }
+  DB = seedData();
+  saveDB();
+}
+function saveDB(){
+  try{ localStorage.setItem('camdock_db_v1', JSON.stringify(DB)); }catch(e){ console.warn('storage write failed', e); }
+}
+
+/* ======================================================================
+   APP STATE / ROUTING
+====================================================================== */
+let SESSION = null; // {role, name, studentIds}
+let currentSection = 'overview';
+let currentTerm = 'First Term';
+
+function goTo(view){
+  document.getElementById('view-home').style.display = view==='home' ? 'block':'none';
+  document.getElementById('view-login').style.display = view==='login' ? 'flex':'none';
+  document.getElementById('view-portal').style.display = view==='portal' ? 'block':'none';
+  window.scrollTo(0,0);
+}
+
+/* ---------- LOGIN ---------- */
+const ROLES = [
+  {id:'admin', label:'Administrator', icon:'grid'},
+  {id:'teacher', label:'Teacher', icon:'chalk'},
+  {id:'parent', label:'Parent', icon:'child'},
+];
+let pickedRole = 'admin';
+function renderRoleGrid(){
+  const g = document.getElementById('role-grid');
+  g.innerHTML = ROLES.map(r=>`<div class="role-btn ${r.id===pickedRole?'active':''}" onclick="pickRole('${r.id}')">${icon(r.icon)}<span>${r.label}</span></div>`).join('');
+  renderLoginFields();
+}
+function pickRole(id){ pickedRole=id; renderRoleGrid(); }
+function renderLoginFields(){
+  const wrap = document.getElementById('login-fields');
+  if(pickedRole==='parent'){
+    wrap.innerHTML = `<div class="login-form-row"><label class="field-label">Select your child</label>
+      <select id="login-child">${DB.students.map(s=>`<option value="${s.id}">${s.name} — ${s.cls}</option>`).join('')}</select></div>`;
+  } else if(pickedRole==='teacher'){
+    wrap.innerHTML = `<div class="login-form-row"><label class="field-label">Select your name</label>
+      <select id="login-teacher">${DB.teachers.map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}</select></div>`;
+  } else {
+    wrap.innerHTML = `<div class="login-form-row"><label class="field-label">Administrator name</label>
+      <input type="text" id="login-admin" value="Head Admin" placeholder="Your name"></div>`;
+  }
+}
+function attemptLogin(){
+  if(pickedRole==='parent'){
+    const id = document.getElementById('login-child').value;
+    const s = DB.students.find(x=>x.id===id);
+    SESSION = {role:'parent', name: s.guardian, childId:id};
+  } else if(pickedRole==='teacher'){
+    const id = document.getElementById('login-teacher').value;
+    const t = DB.teachers.find(x=>x.id===id);
+    SESSION = {role:'teacher', name:t.name, teacherId:id};
+  } else {
+    const nm = document.getElementById('login-admin').value || 'Head Admin';
+    SESSION = {role:'admin', name:nm};
+  }
+  currentSection = 'overview';
+  goTo('portal');
+  renderPortal();
+}
+function logout(){ SESSION=null; goTo('home'); }
+
+/* ======================================================================
+   PORTAL RENDER
+====================================================================== */
+const NAV_ADMIN = [
+  {id:'overview', label:'Overview', icon:'grid'},
+  {id:'students', label:'Student database', icon:'users'},
+  {id:'teachers', label:'Teachers', icon:'chalk'},
+  {id:'results', label:'Results & class average', icon:'book'},
+  {id:'fees', label:'Fees', icon:'cash'},
+];
+const NAV_TEACHER = [
+  {id:'overview', label:'Overview', icon:'grid'},
+  {id:'students', label:'My students', icon:'users'},
+  {id:'results', label:'Results & class average', icon:'book'},
+];
+const NAV_PARENT = [
+  {id:'overview', label:'Overview', icon:'grid'},
+  {id:'results', label:'Results', icon:'book'},
+  {id:'fees', label:'Fees & receipts', icon:'receipt'},
+];
+
+function navFor(){ return SESSION.role==='admin'?NAV_ADMIN : SESSION.role==='teacher'?NAV_TEACHER : NAV_PARENT; }
+
+function renderPortal(){
+  const nav = navFor();
+  document.getElementById('rail-nav').innerHTML = nav.map(n=>
+    `<button class="${n.id===currentSection?'active':''}" onclick="setSection('${n.id}')">${icon(n.icon)}<span>${n.label}</span></button>`
+  ).join('') + `<button onclick="logout()" style="margin-top:8px;">${icon('out')}<span>Sign out</span></button>`;
+  document.getElementById('rail-name').textContent = SESSION.name;
+  document.getElementById('rail-role').textContent = SESSION.role.charAt(0).toUpperCase()+SESSION.role.slice(1);
+  document.getElementById('rail-av').textContent = SESSION.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  renderSection();
+}
+function setSection(id){ currentSection=id; renderSection(); }
+
+function renderSection(){
+  const c = document.getElementById('portal-content');
+  if(currentSection==='overview') c.innerHTML = viewOverview();
+  else if(currentSection==='students') c.innerHTML = viewStudents();
+  else if(currentSection==='teachers') c.innerHTML = viewTeachers();
+  else if(currentSection==='results') c.innerHTML = viewResults();
+  else if(currentSection==='fees') c.innerHTML = viewFees();
+  paintDynamicIcons();
+}
+function paintDynamicIcons(){
+  document.querySelectorAll('[data-icon]').forEach(el=>{ el.innerHTML = icon(el.getAttribute('data-icon')); });
+}
+
+/* ---------- helpers ---------- */
+function initials(name){ return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function naira(n){ return '₦'+Number(n).toLocaleString('en-NG'); }
+function gradeOf(score){
+  if(score>=75) return {g:'A1', tone:'#276847'};
+  if(score>=70) return {g:'B2', tone:'#276847'};
+  if(score>=65) return {g:'B3', tone:'#3B5FA0'};
+  if(score>=60) return {g:'C4', tone:'#3B5FA0'};
+  if(score>=55) return {g:'C5', tone:'#8A5A16'};
+  if(score>=50) return {g:'C6', tone:'#8A5A16'};
+  if(score>=45) return {g:'D7', tone:'#A83A2F'};
+  if(score>=40) return {g:'E8', tone:'#A83A2F'};
+  return {g:'F9', tone:'#A83A2F'};
+}
+function classAverage(cls, term){
+  const subs = subjectsFor(cls);
+  const studs = DB.students.filter(s=>s.cls===cls);
+  if(studs.length===0) return {overall:0, bySubject:{}};
+  const bySubject={};
+  subs.forEach(sub=>{
+    let sum=0,n=0;
+    studs.forEach(s=>{ const v=DB.results[s.id]?.[term]?.[sub]; if(v!=null){sum+=v;n++;} });
+    bySubject[sub]= n? Math.round((sum/n)*10)/10 : 0;
+  });
+  const allVals = Object.values(bySubject);
+  const overall = allVals.length? Math.round((allVals.reduce((a,b)=>a+b,0)/allVals.length)*10)/10 : 0;
+  return {overall, bySubject};
+}
+
+/* ---------- OVERVIEW ---------- */
+function viewOverview(){
+  if(SESSION.role==='parent'){
+    const s = DB.students.find(x=>x.id===SESSION.childId);
+    const cavg = classAverage(s.cls, currentTerm);
+    const myRec = DB.results[s.id]?.[currentTerm]||{};
+    const myAvg = Object.values(myRec).length ? Math.round((Object.values(myRec).reduce((a,b)=>a+b,0)/Object.values(myRec).length)*10)/10 : 0;
+    const fees = DB.fees[s.id]||[];
+    const owed = fees.reduce((a,f)=>a+(f.amount-f.paid),0);
+    return `
+    <div class="content-head"><div><h1>Welcome, ${SESSION.name.split(' ')[0]==='Mr./Mrs.'?SESSION.name:SESSION.name}</h1><p>${s.name} · ${s.cls} · ${currentTerm}</p></div>
+      ${termSwitcher()}
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="lbl">${s.name.split(' ')[0]}'s average</div><div class="val">${myAvg}%</div><div class="sub">${currentTerm}</div></div>
+      <div class="kpi"><div class="lbl">${s.cls} class average</div><div class="val">${cavg.overall}%</div><div class="sub">Across the class</div></div>
+      <div class="kpi"><div class="lbl">Outstanding fees</div><div class="val" style="color:${owed>0?'var(--danger-ink)':'var(--success-ink)'}">${naira(owed)}</div><div class="sub">${owed>0?'Balance due':'Fully paid'}</div></div>
+      <div class="kpi"><div class="lbl">Subjects offered</div><div class="val">${Object.keys(myRec).length}</div><div class="sub">${s.cls}</div></div>
+    </div>
+    <div class="panel"><div class="panel-head"><h2>Quick actions</h2></div>
+      <div class="panel-body" style="display:flex; gap:12px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="setSection('results')">${icon('book')}&nbsp;View full result</button>
+        <button class="btn btn-ghost" onclick="setSection('fees')">${icon('receipt')}&nbsp;View &amp; print receipts</button>
+      </div>
+    </div>`;
+  }
+
+  // admin / teacher overview
+  const totalStudents = DB.students.length;
+  const totalTeachers = DB.teachers.length;
+  const totalCollected = Object.values(DB.fees).flat().reduce((a,f)=>a+f.paid,0);
+  const totalOutstanding = Object.values(DB.fees).flat().reduce((a,f)=>a+(f.amount-f.paid),0);
+  const usedClasses = [...new Set(DB.students.map(s=>s.cls))];
+  const avgs = usedClasses.map(c=>({c, a:classAverage(c, currentTerm).overall})).sort((a,b)=>b.a-a.a);
+  return `
+  <div class="content-head"><div><h1>${SESSION.role==='admin'?'School overview':'My overview'}</h1><p>${currentTerm} · Camdock International School</p></div>${termSwitcher()}</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lbl">Students enrolled</div><div class="val">${totalStudents}</div><div class="sub">${usedClasses.length} active classes</div></div>
+    <div class="kpi"><div class="lbl">Teaching staff</div><div class="val">${totalTeachers}</div><div class="sub">On record</div></div>
+    <div class="kpi"><div class="lbl">Fees collected</div><div class="val">${naira(totalCollected)}</div><div class="sub">${currentTerm}</div></div>
+    <div class="kpi"><div class="lbl">Outstanding</div><div class="val" style="color:var(--danger-ink)">${naira(totalOutstanding)}</div><div class="sub">Across all students</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Class averages — ${currentTerm}</h2></div>
+    <div class="panel-body scrollx"><table><thead><tr><th>Class</th><th>Class average</th><th>Students</th></tr></thead><tbody>
+      ${avgs.map(r=>`<tr><td>${r.c}</td><td><strong>${r.a}%</strong></td><td>${DB.students.filter(s=>s.cls===r.c).length}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">No data yet</td></tr>`}
+    </tbody></table></div>
+  </div>`;
+}
+function termSwitcher(){
+  return `<div class="toolbar"><select onchange="currentTerm=this.value; renderSection();">
+    ${['First Term','Second Term','Third Term'].map(t=>`<option value="${t}" ${t===currentTerm?'selected':''}>${t}</option>`).join('')}
+  </select></div>`;
+}
+
+/* ---------- STUDENTS ---------- */
+function viewStudents(){
+  const teacherClasses = SESSION.role==='teacher' ? (DB.teachers.find(t=>t.id===SESSION.teacherId).classes.split(',').map(s=>s.trim())) : null;
+  let list = DB.students;
+  if(teacherClasses) list = list.filter(s=>teacherClasses.includes(s.cls));
+  const canAdd = SESSION.role==='admin';
+  return `
+  <div class="content-head"><div><h1>Student database</h1><p>${list.length} students on record</p></div>
+    ${canAdd?`<button class="btn btn-primary" onclick="openStudentModal()">${icon('plus')}&nbsp;Add student</button>`:''}
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>All students</h2>
+      <div class="toolbar"><input type="text" placeholder="Search by name…" oninput="filterStudentTable(this.value)"></div>
+    </div>
+    <div class="panel-body scrollx">
+      <table id="student-table"><thead><tr><th>Student</th><th>Class</th><th>Gender</th><th>Guardian</th><th>${currentTerm} avg</th></tr></thead>
+      <tbody>${list.map(rowStudent).join('')}</tbody></table>
+    </div>
+  </div>`;
+}
+function rowStudent(s){
+  const rec = DB.results[s.id]?.[currentTerm]||{};
+  const vals = Object.values(rec);
+  const avg = vals.length? Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10 : '—';
+  return `<tr data-name="${s.name.toLowerCase()}"><td><div class="name-cell"><span class="avatar-sm">${initials(s.name)}</span>${s.name}</div></td><td>${s.cls}</td><td>${s.gender}</td><td>${s.guardian}</td><td>${avg}${avg!=='—'?'%':''}</td></tr>`;
+}
+function filterStudentTable(q){
+  q=q.toLowerCase();
+  document.querySelectorAll('#student-table tbody tr').forEach(r=>{
+    r.style.display = r.getAttribute('data-name').includes(q) ? '' : 'none';
+  });
+}
+function openStudentModal(){
+  const sel = document.getElementById('ns-class');
+  sel.innerHTML = CLASSES.map(c=>`<option>${c}</option>`).join('');
+  document.getElementById('ns-name').value=''; document.getElementById('ns-guardian').value='';
+  openModal('modal-student');
+}
+function submitNewStudent(){
+  const name = document.getElementById('ns-name').value.trim();
+  if(!name){ alert("Please enter the student's name."); return; }
+  const cls = document.getElementById('ns-class').value;
+  const gender = document.getElementById('ns-gender').value;
+  const guardian = document.getElementById('ns-guardian').value.trim() || '—';
+  const id = 'S'+Math.floor(2000+Math.random()*8000);
+  DB.students.push({id,name,cls,gender,guardian});
+  DB.results[id]={}; const terms=['First Term','Second Term','Third Term'];
+  terms.forEach(t=>{ const rec={}; subjectsFor(cls).forEach(sub=>rec[sub]=0); DB.results[id][t]=rec; });
+  DB.fees[id]=[];
+  saveDB(); closeModal('modal-student'); renderSection();
+}
+
+/* ---------- TEACHERS ---------- */
+function viewTeachers(){
+  return `
+  <div class="content-head"><div><h1>Teachers</h1><p>${DB.teachers.length} members of staff</p></div>
+    <button class="btn btn-primary" onclick="openModal('modal-teacher')">${icon('plus')}&nbsp;Add teacher</button>
+  </div>
+  <div class="panel"><div class="panel-head"><h2>Teaching staff directory</h2></div>
+    <div class="panel-body scrollx"><table><thead><tr><th>Teacher</th><th>Subject</th><th>Classes</th><th>Phone</th></tr></thead>
+    <tbody>${DB.teachers.map(t=>`<tr><td><div class="name-cell"><span class="avatar-sm">${initials(t.name)}</span>${t.name}</div></td><td>${t.subject}</td><td>${t.classes}</td><td>${t.phone}</td></tr>`).join('')}</tbody></table></div>
+  </div>`;
+}
+function submitNewTeacher(){
+  const name = document.getElementById('nt-name').value.trim();
+  if(!name){ alert("Please enter the teacher's name."); return; }
+  const subject = document.getElementById('nt-subject').value.trim()||'—';
+  const classes = document.getElementById('nt-classes').value.trim()||'—';
+  const phone = document.getElementById('nt-phone').value.trim()||'—';
+  DB.teachers.push({id:'T'+Math.floor(10+Math.random()*89), name, subject, classes, phone});
+  saveDB(); closeModal('modal-teacher'); renderSection();
+}
+
+/* ---------- RESULTS ---------- */
+let resultsClass = null;
+function viewResults(){
+  if(SESSION.role==='parent'){
+    const s = DB.students.find(x=>x.id===SESSION.childId);
+    const rec = DB.results[s.id]?.[currentTerm]||{};
+    const cavg = classAverage(s.cls, currentTerm).bySubject;
+    return `
+    <div class="content-head"><div><h1>${s.name}'s results</h1><p>${s.cls} · ${currentTerm}</p></div>
+      <div style="display:flex;gap:10px;">${termSwitcher()}<button class="btn btn-primary" onclick="openReportModal('${s.id}')">${icon('print')}&nbsp;Print result sheet</button></div>
+    </div>
+    <div class="panel"><div class="panel-head"><h2>Subject scores vs. class average</h2></div>
+      <div class="panel-body scrollx"><table><thead><tr><th>Subject</th><th>Score</th><th>Grade</th><th>Class average</th></tr></thead>
+      <tbody>${Object.keys(rec).map(sub=>{const g=gradeOf(rec[sub]);return `<tr><td>${sub}</td><td>${rec[sub]}%</td><td><span class="grade-badge" style="background:${g.tone}">${g.g}</span></td><td>${cavg[sub]}%</td></tr>`;}).join('')}</tbody></table></div>
+    </div>`;
+  }
+
+  // admin / teacher: pick a class, edit a grid
+  const teacherClasses = SESSION.role==='teacher' ? DB.teachers.find(t=>t.id===SESSION.teacherId).classes.split(',').map(s=>s.trim()) : CLASSES.filter(c=>DB.students.some(s=>s.cls===c));
+  if(!resultsClass || !teacherClasses.includes(resultsClass)) resultsClass = teacherClasses[0];
+  const studs = DB.students.filter(s=>s.cls===resultsClass);
+  const subs = subjectsFor(resultsClass||'Primary 1');
+  const avg = classAverage(resultsClass, currentTerm);
+  return `
+  <div class="content-head"><div><h1>Results &amp; class average</h1><p>Enter scores per subject — the class average updates automatically.</p></div>
+    <div class="toolbar">
+      <select onchange="resultsClass=this.value; renderSection();">${teacherClasses.map(c=>`<option value="${c}" ${c===resultsClass?'selected':''}>${c}</option>`).join('')}</select>
+      ${termSwitcher()}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>${resultsClass} — ${currentTerm}</h2><span class="muted" style="font-size:13px;">Class overall average: <strong>${avg.overall}%</strong></span></div>
+    <div class="panel-body scrollx">
+    ${studs.length? `<table><thead><tr><th>Student</th>${subs.map(s=>`<th>${s}</th>`).join('')}</tr></thead><tbody>
+      ${studs.map(s=>`<tr>${`<td><div class="name-cell"><span class="avatar-sm">${initials(s.name)}</span>${s.name}</div></td>`}${subs.map(sub=>`<td><input type="number" min="0" max="100" value="${DB.results[s.id][currentTerm][sub]}" onchange="updateScore('${s.id}','${sub}',this.value)"></td>`).join('')}</tr>`).join('')}
+      <tr class="avg-row"><td>Class average</td>${subs.map(sub=>`<td>${avg.bySubject[sub]}%</td>`).join('')}</tr>
+    </tbody></table>` : `<div class="empty-state">No students in ${resultsClass} yet.</div>`}
+    </div>
+  </div>`;
+}
+function updateScore(sid, sub, val){
+  const n = Math.max(0, Math.min(100, Number(val)||0));
+  DB.results[sid][currentTerm][sub] = n;
+  saveDB(); renderSection();
+}
+
+/* ---------- FEES ---------- */
+function viewFees(){
+  if(SESSION.role==='parent'){
+    const s = DB.students.find(x=>x.id===SESSION.childId);
+    const fees = DB.fees[s.id]||[];
+    return `
+    <div class="content-head"><div><h1>Fees &amp; receipts</h1><p>${s.name} · ${s.cls}</p></div></div>
+    <div class="panel"><div class="panel-head"><h2>Payment history</h2></div>
+      <div class="panel-body scrollx">
+      ${fees.length? `<table><thead><tr><th>Type</th><th>Term</th><th>Billed</th><th>Paid</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>
+        ${fees.map(f=>{const bal=f.amount-f.paid; const status= bal<=0?'pill-paid':(f.paid>0?'pill-partial':'pill-due'); const label= bal<=0?'Paid':(f.paid>0?'Partial':'Due');
+          return `<tr><td>${f.type}</td><td>${f.term}</td><td>${naira(f.amount)}</td><td>${naira(f.paid)}</td><td><span class="pill ${status}">${label}</span></td><td>${f.date}</td><td><button class="btn btn-ghost btn-sm" onclick="openReceiptModal('${s.id}','${f.id}')">${icon('print')}&nbsp;Receipt</button></td></tr>`;}).join('')}
+      </tbody></table>` : `<div class="empty-state">No fee records yet.</div>`}
+      </div>
+    </div>`;
+  }
+  // admin
+  const allFees = DB.students.map(s=>({s, fees: DB.fees[s.id]||[]}));
+  return `
+  <div class="content-head"><div><h1>Fees</h1><p>Record payments and issue receipts</p></div>
+    <button class="btn btn-primary" onclick="openPaymentModal()">${icon('plus')}&nbsp;Record payment</button>
+  </div>
+  <div class="panel"><div class="panel-head"><h2>All fee records</h2></div>
+    <div class="panel-body scrollx">
+    <table><thead><tr><th>Student</th><th>Type</th><th>Term</th><th>Billed</th><th>Paid</th><th>Status</th><th></th></tr></thead><tbody>
+    ${allFees.flatMap(({s,fees})=>fees.map(f=>{const bal=f.amount-f.paid; const status= bal<=0?'pill-paid':(f.paid>0?'pill-partial':'pill-due'); const label= bal<=0?'Paid':(f.paid>0?'Partial':'Due');
+      return `<tr><td><div class="name-cell"><span class="avatar-sm">${initials(s.name)}</span>${s.name}</div></td><td>${f.type}</td><td>${f.term}</td><td>${naira(f.amount)}</td><td>${naira(f.paid)}</td><td><span class="pill ${status}">${label}</span></td><td><button class="btn btn-ghost btn-sm" onclick="openReceiptModal('${s.id}','${f.id}')">${icon('print')}&nbsp;Receipt</button></td></tr>`;})).join('') || `<tr><td colspan="7" class="muted">No records yet.</td></tr>`}
+    </tbody></table>
+    </div>
+  </div>`;
+}
+function openPaymentModal(){
+  const sel = document.getElementById('np-student');
+  sel.innerHTML = DB.students.map(s=>`<option value="${s.id}">${s.name} — ${s.cls}</option>`).join('');
+  document.getElementById('np-amount').value=''; document.getElementById('np-paid').value='';
+  openModal('modal-payment');
+}
+function submitPayment(){
+  const sid = document.getElementById('np-student').value;
+  const type = document.getElementById('np-type').value;
+  const term = document.getElementById('np-term').value;
+  const amount = Number(document.getElementById('np-amount').value)||0;
+  const paid = Number(document.getElementById('np-paid').value)||0;
+  if(amount<=0){ alert('Please enter the amount billed.'); return; }
+  const id = 'R'+sid+Math.floor(Math.random()*9000);
+  DB.fees[sid] = DB.fees[sid]||[];
+  DB.fees[sid].push({id, type, term, amount, paid, date:new Date().toISOString().slice(0,10)});
+  saveDB(); closeModal('modal-payment'); renderSection();
+}
+
+/* ---------- RECEIPT / REPORT PRINTOUTS ---------- */
+function openReceiptModal(sid, fid){
+  const s = DB.students.find(x=>x.id===sid);
+  const f = DB.fees[sid].find(x=>x.id===fid);
+  const bal = f.amount - f.paid;
+  const status = bal<=0 ? {t:'PAID IN FULL', bg:'#EAF4EE', ink:'#276847'} : (f.paid>0? {t:'PART PAYMENT', bg:'#FCF3E3', ink:'#8A5A16'} : {t:'UNPAID', bg:'#FBEAE8', ink:'#A83A2F'});
+  document.getElementById('receipt-sheet').innerHTML = `
+    <div class="receipt-top">
+      <span class="crest" style="width:44px;display:block;">${crestSVG(44)}</span>
+      <div><div class="rt-name">Camdock International School Ltd</div><div class="rt-addr">Port Harcourt, Rivers State, Nigeria · Est. 2026</div></div>
+    </div>
+    <div class="receipt-kind">${f.type.toUpperCase()} RECEIPT</div>
+    <div class="receipt-meta">
+      <div><span class="k">RECEIPT NO.</span><span>${f.id}</span></div>
+      <div><span class="k">DATE</span><span>${f.date}</span></div>
+      <div><span class="k">STUDENT</span><span>${s.name}</span></div>
+      <div><span class="k">CLASS</span><span>${s.cls}</span></div>
+      <div><span class="k">TERM</span><span>${f.term}</span></div>
+      <div><span class="k">STATUS</span><span class="receipt-status" style="background:${status.bg};color:${status.ink};display:inline-block;">${status.t}</span></div>
+    </div>
+    <table class="receipt-table"><thead><tr><th>Description</th><th style="text-align:right;">Amount</th></tr></thead>
+      <tbody>
+        <tr><td>${f.type} — ${f.term}</td><td style="text-align:right;">${naira(f.amount)}</td></tr>
+        <tr><td>Amount paid</td><td style="text-align:right;">${naira(f.paid)}</td></tr>
+        ${bal>0?`<tr><td>Balance outstanding</td><td style="text-align:right;color:#A83A2F;">${naira(bal)}</td></tr>`:''}
+      </tbody>
+    </table>
+    <div class="receipt-total"><span>Total paid</span><span>${naira(f.paid)}</span></div>
+    <div class="receipt-foot"><div class="sig">Bursar's signature</div><div class="sig">School stamp</div></div>
+  `;
+  openModal('modal-receipt');
+}
+function openReportModal(sid){
+  const s = DB.students.find(x=>x.id===sid);
+  const rec = DB.results[sid]?.[currentTerm]||{};
+  const cavg = classAverage(s.cls, currentTerm).bySubject;
+  const vals = Object.values(rec);
+  const myAvg = vals.length? Math.round((vals.reduce((a,b)=>a+b,0)/vals.length)*10)/10 : 0;
+  document.getElementById('report-sheet').innerHTML = `
+    <div class="receipt-top">
+      <span class="crest" style="width:44px;display:block;">${crestSVG(44)}</span>
+      <div><div class="rt-name">Camdock International School Ltd</div><div class="rt-addr">Port Harcourt, Rivers State, Nigeria · Est. 2026</div></div>
+    </div>
+    <div class="receipt-kind">TERMLY RESULT SHEET</div>
+    <div class="receipt-meta">
+      <div><span class="k">STUDENT</span><span>${s.name}</span></div>
+      <div><span class="k">CLASS</span><span>${s.cls}</span></div>
+      <div><span class="k">TERM</span><span>${currentTerm}</span></div>
+      <div><span class="k">OVERALL AVERAGE</span><span>${myAvg}%</span></div>
+    </div>
+    <table class="receipt-table"><thead><tr><th>Subject</th><th>Score</th><th>Grade</th><th style="text-align:right;">Class average</th></tr></thead>
+      <tbody>${Object.keys(rec).map(sub=>{const g=gradeOf(rec[sub]);return `<tr><td>${sub}</td><td>${rec[sub]}%</td><td>${g.g}</td><td style="text-align:right;">${cavg[sub]}%</td></tr>`;}).join('')}</tbody>
+    </table>
+    <div class="receipt-foot"><div class="sig">Class teacher</div><div class="sig">Head of school</div></div>
+  `;
+  openModal('modal-report');
+}
+
+/* ---------- MODAL HELPERS ---------- */
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-backdrop').forEach(m=>{
+  m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('open'); });
+});
+
+/* ======================================================================
+   INIT
+====================================================================== */
+function init(){
+  loadDB();
+  paintStaticIcons();
+  document.getElementById('stat-students').textContent = DB.students.length;
+  document.getElementById('stat-teachers').textContent = DB.teachers.length;
+  document.getElementById('stat-classes').textContent = [...new Set(DB.students.map(s=>s.cls))].length + '+';
+  renderRoleGrid();
+  goTo('home');
+}
+init();
+</script>
+</body>
+</html>
