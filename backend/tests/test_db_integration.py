@@ -5,8 +5,6 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 
-from app.core.config import get_settings
-
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
@@ -17,9 +15,6 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(autouse=True)
 def database_env(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
-    get_settings.cache_clear()
-    yield
-    get_settings.cache_clear()
 
 
 def test_database_connection():

@@ -1,13 +1,8 @@
-import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 
-from app.core.config import get_settings
 from app.core.errors import AppError
-from app.main import create_app
-
-DB_URL = "postgresql+psycopg://user:pw@localhost:5432/db"
 
 
 class ScoreIn(BaseModel):
@@ -15,11 +10,9 @@ class ScoreIn(BaseModel):
     password: str
 
 
-def build_client(monkeypatch, environment: str = "development") -> TestClient:
-    monkeypatch.setenv("DATABASE_URL", DB_URL)
-    monkeypatch.setenv("ENVIRONMENT", environment)
-    get_settings.cache_clear()
-    app = create_app()
+def build_client(make_client, environment: str = "development") -> TestClient:
+    client = make_client(environment)
+    app = client.app
 
     @app.post("/probe/score")
     def post_score(body: ScoreIn):
@@ -37,17 +30,11 @@ def build_client(monkeypatch, environment: str = "development") -> TestClient:
     def boom():
         raise RuntimeError("secret internal detail")
 
-    return TestClient(app, raise_server_exceptions=False)
+    return client
 
 
-@pytest.fixture(autouse=True)
-def reset_settings():
-    yield
-    get_settings.cache_clear()
-
-
-def test_validation_error_uses_standard_shape_without_echoing_input(monkeypatch):
-    client = build_client(monkeypatch)
+def test_validation_error_uses_standard_shape_without_echoing_input(make_client):
+    client = build_client(make_client)
     response = client.post("/probe/score", json={"score": 101, "password": "hunter2"})
     assert response.status_code == 422
     error = response.json()["error"]
@@ -57,44 +44,44 @@ def test_validation_error_uses_standard_shape_without_echoing_input(monkeypatch)
     assert "101" not in response.text
 
 
-def test_missing_field_is_reported_by_path(monkeypatch):
-    client = build_client(monkeypatch)
+def test_missing_field_is_reported_by_path(make_client):
+    client = build_client(make_client)
     response = client.post("/probe/score", json={"score": 50})
     fields = [d["field"] for d in response.json()["error"]["details"]]
     assert fields == ["body.password"]
 
 
-def test_unknown_path_returns_404_standard_shape(monkeypatch):
-    response = build_client(monkeypatch).get("/nope")
+def test_unknown_path_returns_404_standard_shape(make_client):
+    response = build_client(make_client).get("/nope")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
     assert "details" not in response.json()["error"]
 
 
-def test_wrong_method_returns_405(monkeypatch):
-    response = build_client(monkeypatch).get("/probe/score")
+def test_wrong_method_returns_405(make_client):
+    response = build_client(make_client).get("/probe/score")
     assert response.status_code == 405
     assert response.json()["error"]["code"] == "method_not_allowed"
 
 
-def test_http_exception_mapped_to_standard_shape(monkeypatch):
-    response = build_client(monkeypatch).get("/probe/http-error")
+def test_http_exception_mapped_to_standard_shape(make_client):
+    response = build_client(make_client).get("/probe/http-error")
     assert response.status_code == 403
     assert response.json() == {
         "error": {"code": "forbidden", "message": "Not allowed."}
     }
 
 
-def test_app_error_uses_its_status_and_code(monkeypatch):
-    response = build_client(monkeypatch).get("/probe/app-error")
+def test_app_error_uses_its_status_and_code(make_client):
+    response = build_client(make_client).get("/probe/app-error")
     assert response.status_code == 409
     assert response.json() == {
         "error": {"code": "conflict", "message": "Duplicate record."}
     }
 
 
-def test_unhandled_exception_returns_generic_500(monkeypatch):
-    response = build_client(monkeypatch).get("/probe/boom")
+def test_unhandled_exception_returns_generic_500(make_client):
+    response = build_client(make_client).get("/probe/boom")
     assert response.status_code == 500
     assert response.json() == {
         "error": {"code": "internal_error", "message": "An internal error occurred."}
@@ -103,13 +90,13 @@ def test_unhandled_exception_returns_generic_500(monkeypatch):
     assert "Traceback" not in response.text
 
 
-def test_docs_enabled_in_development(monkeypatch):
-    client = build_client(monkeypatch, "development")
+def test_docs_enabled_in_development(make_client):
+    client = build_client(make_client, "development")
     assert client.get("/docs").status_code == 200
     assert client.get("/openapi.json").status_code == 200
 
 
-def test_docs_disabled_in_production(monkeypatch):
-    client = build_client(monkeypatch, "production")
+def test_docs_disabled_in_production(make_client):
+    client = build_client(make_client, "production")
     assert client.get("/docs").status_code == 404
     assert client.get("/openapi.json").status_code == 404
