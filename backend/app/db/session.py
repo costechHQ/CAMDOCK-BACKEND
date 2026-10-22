@@ -6,11 +6,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 
+CONNECT_TIMEOUT_SECONDS = 5
+
 
 @lru_cache
 def get_engine() -> Engine:
     return create_engine(
-        get_settings().database_url.get_secret_value(), pool_pre_ping=True
+        get_settings().database_url.get_secret_value(),
+        pool_pre_ping=True,
+        connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
     )
 
 
