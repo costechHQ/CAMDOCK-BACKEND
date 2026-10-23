@@ -1,7 +1,10 @@
 import os
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
 
 from app.core.config import get_settings
 from app.db import session as session_module
@@ -55,3 +58,31 @@ def make_client(monkeypatch):
         return TestClient(create_app(), raise_server_exceptions=raise_server_exceptions)
 
     return _make
+
+
+@pytest.fixture(scope="session")
+def migrated_engine():
+    """Engine for the guarded `*_test` database, rebuilt from migrations once per run."""
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("TEST_DATABASE_URL not set; needs a Postgres test DB")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("DATABASE_URL", url)
+        get_settings.cache_clear()
+        config = Config("alembic.ini")
+        command.downgrade(config, "base")
+        command.upgrade(config, "head")
+        engine = create_engine(url)
+        yield engine
+        engine.dispose()
+        get_settings.cache_clear()
+
+
+@pytest.fixture
+def db(migrated_engine):
+    """A connection inside a transaction that is always rolled back."""
+    connection = migrated_engine.connect()
+    transaction = connection.begin()
+    yield connection
+    transaction.rollback()
+    connection.close()
