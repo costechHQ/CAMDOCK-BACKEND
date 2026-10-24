@@ -6,12 +6,15 @@ from app.models.academic import (
     Term,
 )
 from app.models.accounts import Teacher, TeacherClass, TeacherSubject, User
+from app.models.fees import FeePayment, FeeRecord
 from app.models.results import Result
 from app.models.students import ParentStudent, Student
 
 __all__ = [
     "AcademicYear",
     "ClassSubject",
+    "FeePayment",
+    "FeeRecord",
     "ParentStudent",
     "Result",
     "SchoolClass",
