@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     database_url: SecretStr
     api_v1_prefix: str = "/api/v1"
+    session_ttl_hours: int = Field(default=12, gt=0)
 
     @property
     def docs_enabled(self) -> bool:

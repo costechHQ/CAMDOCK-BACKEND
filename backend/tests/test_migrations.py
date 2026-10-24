@@ -26,7 +26,7 @@ from tests.support import assert_safe_test_database
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 SCRATCH_DATABASE = "camdock_migrations_test"
-REVISIONS = ["0001", "0002", "0003", "0004", "0005", "0006"]
+REVISIONS = ["0001", "0002", "0003", "0004", "0005", "0006", "0007"]
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set; needs a Postgres test DB"
