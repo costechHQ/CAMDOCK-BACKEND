@@ -4,10 +4,10 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import delete, func, insert, select, update
-from sqlalchemy.exc import IntegrityError
 
 from app.db.base import Base
 from app.models import AcademicYear, ClassSubject, SchoolClass, Subject, Term
+from tests.support import assert_rejected
 
 YEAR = {
     "name": "2026/2027",
@@ -26,12 +26,6 @@ def add_year(db, **overrides) -> int:
 
 def add_class(db, name="JSS 1", level="junior_secondary") -> int:
     return add(db, SchoolClass, name=name, level=level)
-
-
-def assert_rejected(db, statement) -> None:
-    """The statement must violate a constraint; the savepoint keeps the test usable."""
-    with pytest.raises(IntegrityError), db.begin_nested():
-        db.execute(statement)
 
 
 def test_models_registered_on_metadata():
@@ -66,7 +60,7 @@ def test_valid_rows_are_accepted_with_timestamps(db):
 
 def test_academic_year_name_unique(db):
     add_year(db)
-    assert_rejected(db, insert(AcademicYear).values(**YEAR))
+    assert_rejected(db, insert(AcademicYear).values(**YEAR), "uq_academic_years_name")
 
 
 @pytest.mark.parametrize(
@@ -77,6 +71,7 @@ def test_academic_year_end_must_be_after_start(db, start, end):
     assert_rejected(
         db,
         insert(AcademicYear).values(name="2030/2031", start_date=start, end_date=end),
+        "ck_academic_years_end_after_start",
     )
 
 
@@ -87,6 +82,7 @@ def test_only_one_current_academic_year(db):
         insert(AcademicYear).values(
             **{**YEAR, "name": "2027/2028", "is_current": True}
         ),
+        "uq_academic_years_single_current",
     )
     # Many non-current years are fine, and the flag can move once it is cleared.
     add_year(db, name="2025/2026")
@@ -102,7 +98,9 @@ def test_term_unique_per_year_and_allowed_across_years(db):
     other_year_id = add_year(db, name="2027/2028")
     add(db, Term, academic_year_id=year_id, name="First Term")
     assert_rejected(
-        db, insert(Term).values(academic_year_id=year_id, name="First Term")
+        db,
+        insert(Term).values(academic_year_id=year_id, name="First Term"),
+        "uq_terms_academic_year_id_name",
     )
     add(db, Term, academic_year_id=other_year_id, name="First Term")
 
@@ -110,7 +108,9 @@ def test_term_unique_per_year_and_allowed_across_years(db):
 def test_term_name_must_be_valid(db):
     year_id = add_year(db)
     assert_rejected(
-        db, insert(Term).values(academic_year_id=year_id, name="Fourth Term")
+        db,
+        insert(Term).values(academic_year_id=year_id, name="Fourth Term"),
+        "ck_terms_valid_name",
     )
 
 
@@ -125,24 +125,35 @@ def test_term_dates_optional_but_ordered(db):
             start_date=date(2027, 1, 10),
             end_date=date(2026, 12, 1),
         ),
+        "ck_terms_end_after_start",
     )
 
 
 def test_term_requires_existing_year(db):
-    assert_rejected(db, insert(Term).values(academic_year_id=999999, name="First Term"))
+    assert_rejected(
+        db,
+        insert(Term).values(academic_year_id=999999, name="First Term"),
+        "fk_terms_academic_year_id_academic_years",
+    )
 
 
 def test_class_name_unique_and_level_valid(db):
     add_class(db)
     assert_rejected(
-        db, insert(SchoolClass).values(name="JSS 1", level="junior_secondary")
+        db,
+        insert(SchoolClass).values(name="JSS 1", level="junior_secondary"),
+        "uq_classes_name",
     )
-    assert_rejected(db, insert(SchoolClass).values(name="Year 9", level="middle"))
+    assert_rejected(
+        db,
+        insert(SchoolClass).values(name="Year 9", level="middle"),
+        "ck_classes_valid_level",
+    )
 
 
 def test_subject_name_unique(db):
     add(db, Subject, name="Mathematics")
-    assert_rejected(db, insert(Subject).values(name="Mathematics"))
+    assert_rejected(db, insert(Subject).values(name="Mathematics"), "uq_subjects_name")
 
 
 def test_class_subject_pair_unique_and_references_checked(db):
@@ -150,13 +161,19 @@ def test_class_subject_pair_unique_and_references_checked(db):
     subject_id = add(db, Subject, name="Mathematics")
     db.execute(insert(ClassSubject).values(class_id=class_id, subject_id=subject_id))
     assert_rejected(
-        db, insert(ClassSubject).values(class_id=class_id, subject_id=subject_id)
+        db,
+        insert(ClassSubject).values(class_id=class_id, subject_id=subject_id),
+        "pk_class_subjects",
     )
     assert_rejected(
-        db, insert(ClassSubject).values(class_id=999999, subject_id=subject_id)
+        db,
+        insert(ClassSubject).values(class_id=999999, subject_id=subject_id),
+        "fk_class_subjects_class_id_classes",
     )
     assert_rejected(
-        db, insert(ClassSubject).values(class_id=class_id, subject_id=999999)
+        db,
+        insert(ClassSubject).values(class_id=class_id, subject_id=999999),
+        "fk_class_subjects_subject_id_subjects",
     )
 
 
@@ -166,6 +183,18 @@ def test_referenced_rows_cannot_be_deleted(db):
     class_id = add_class(db)
     subject_id = add(db, Subject, name="Mathematics")
     db.execute(insert(ClassSubject).values(class_id=class_id, subject_id=subject_id))
-    assert_rejected(db, delete(AcademicYear).where(AcademicYear.id == year_id))
-    assert_rejected(db, delete(SchoolClass).where(SchoolClass.id == class_id))
-    assert_rejected(db, delete(Subject).where(Subject.id == subject_id))
+    assert_rejected(
+        db,
+        delete(AcademicYear).where(AcademicYear.id == year_id),
+        "fk_terms_academic_year_id_academic_years",
+    )
+    assert_rejected(
+        db,
+        delete(SchoolClass).where(SchoolClass.id == class_id),
+        "fk_class_subjects_class_id_classes",
+    )
+    assert_rejected(
+        db,
+        delete(Subject).where(Subject.id == subject_id),
+        "fk_class_subjects_subject_id_subjects",
+    )
