@@ -8,7 +8,7 @@ DB_URL = "postgresql+psycopg://user:s3cret-pw@localhost:5432/db"
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for name in ("ENVIRONMENT", "DATABASE_URL", "API_V1_PREFIX"):
+    for name in ("ENVIRONMENT", "DATABASE_URL", "API_V1_PREFIX", "SESSION_TTL_HOURS"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -47,6 +47,22 @@ def test_docs_enabled_only_in_development(monkeypatch, environment, expected):
     monkeypatch.setenv("DATABASE_URL", DB_URL)
     monkeypatch.setenv("ENVIRONMENT", environment)
     assert make_settings().docs_enabled is expected
+
+
+def test_session_ttl_defaults_and_overrides(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", DB_URL)
+    assert make_settings().session_ttl_hours == 12
+    monkeypatch.setenv("SESSION_TTL_HOURS", "2")
+    assert make_settings().session_ttl_hours == 2
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_session_ttl_must_be_positive(monkeypatch, value):
+    monkeypatch.setenv("DATABASE_URL", DB_URL)
+    monkeypatch.setenv("SESSION_TTL_HOURS", value)
+    with pytest.raises(ValidationError) as exc:
+        make_settings()
+    assert "session_ttl_hours" in str(exc.value)
 
 
 def test_secret_not_exposed_in_errors_or_repr(monkeypatch):

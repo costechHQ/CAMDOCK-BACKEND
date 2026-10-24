@@ -132,7 +132,7 @@ cleared between tests (see `tests/conftest.py`).
 ```
 backend/
   app/
-    api/v1/        routers (health)
+    routers/       endpoint modules (health)
     core/          settings and error handling
     db/            SQLAlchemy base and session
     main.py        create_app() factory

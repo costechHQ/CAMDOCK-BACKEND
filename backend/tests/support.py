@@ -1,5 +1,6 @@
+import pytest
 from sqlalchemy.engine import make_url
-from sqlalchemy.exc import ArgumentError
+from sqlalchemy.exc import ArgumentError, IntegrityError
 
 TEST_DATABASE_SUFFIX = "_test"
 
@@ -18,3 +19,16 @@ def assert_safe_test_database(url: str) -> None:
             f"TEST_DATABASE_URL must point to a database whose name ends with "
             f"'{TEST_DATABASE_SUFFIX}'."
         )
+
+
+def assert_rejected(db, statement, constraint: str | tuple[str, ...]) -> None:
+    """The statement must violate the named constraint.
+
+    Pass several names only when more than one constraint blocks the statement and
+    Postgres may report any of them (e.g. deleting a row referenced from two tables).
+    Runs in a savepoint so the surrounding test transaction stays usable.
+    """
+    allowed = (constraint,) if isinstance(constraint, str) else constraint
+    with pytest.raises(IntegrityError) as excinfo, db.begin_nested():
+        db.execute(statement)
+    assert excinfo.value.orig.diag.constraint_name in allowed
