@@ -59,3 +59,10 @@ class StudentOut(BaseModel):
     date_of_birth: date | None
     guardian_display_name: str | None
     status: str
+
+
+class StudentPage(BaseModel):
+    items: list[StudentOut]
+    total: int
+    limit: int
+    offset: int
