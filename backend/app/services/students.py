@@ -7,6 +7,7 @@ from app.core.errors import AppError
 from app.models import AuditLog, SchoolClass, Student, User
 from app.schemas.students import StudentCreate, StudentOut, StudentPage
 from app.services import access
+from app.services.search import name_contains
 
 
 def _to_out(student: Student, class_name: str) -> StudentOut:
@@ -23,12 +24,6 @@ def _to_out(student: Student, class_name: str) -> StudentOut:
     )
 
 
-def _like_pattern(text: str) -> str:
-    """Substring pattern in which `%`, `_` and `\\` in the input match literally."""
-    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    return f"%{escaped}%"
-
-
 def list_students(
     db: Session,
     user: User,
@@ -41,9 +36,7 @@ def list_students(
     """Active students the user may reach, scoped in SQL, ordered by name then id."""
     conditions = [Student.is_active.is_(True), access.student_scope(user)]
     if q and q.strip():
-        conditions.append(
-            Student.full_name.ilike(_like_pattern(q.strip()), escape="\\")
-        )
+        conditions.append(name_contains(Student.full_name, q.strip()))
     if class_id is not None:
         conditions.append(Student.class_id == class_id)
 

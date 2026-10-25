@@ -63,3 +63,10 @@ class TeacherOut(BaseModel):
     is_active: bool
     classes: list[NamedRef]
     subjects: list[NamedRef]
+
+
+class TeacherPage(BaseModel):
+    items: list[TeacherOut]
+    total: int
+    limit: int
+    offset: int

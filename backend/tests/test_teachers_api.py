@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import func, select, update
+from sqlalchemy import event, func, select, update
 
 from app.models import (
     AuditLog,
@@ -250,3 +250,174 @@ def test_creation_is_audited_without_the_phone(db, api_client, admin, setup):
         "class_ids": sorted([setup["p1"], setup["p2"]]),
         "subject_ids": [setup["maths"]],
     }
+
+
+# --- list ------------------------------------------------------------------------------
+
+
+def add_teacher(
+    db, name, *, classes=(), subjects=(), phone=None, active=True, email=None
+):
+    email = email or f"{name.replace(' ', '').lower()}@camdock.test"
+    user_id = add_user(db, email=email, role="teacher")
+    teacher_id = add(
+        db, Teacher, user_id=user_id, full_name=name, phone=phone, is_active=active
+    )
+    for class_id in classes:
+        add_link(db, TeacherClass, teacher_id=teacher_id, class_id=class_id)
+    for subject_id in subjects:
+        add_link(db, TeacherSubject, teacher_id=teacher_id, subject_id=subject_id)
+    return teacher_id
+
+
+def add_link(db, model, **values):
+    db.execute(model.__table__.insert().values(**values))
+
+
+def names(response) -> list[str]:
+    return [item["full_name"] for item in response.json()["items"]]
+
+
+@pytest.fixture
+def staff(db, setup):
+    return {
+        "ada": add_teacher(
+            db,
+            "Ada Obi",
+            classes=[setup["p2"], setup["p1"]],
+            subjects=[setup["maths"]],
+            phone="0803",
+        ),
+        "chi": add_teacher(
+            db, "Chidi Eze", classes=[setup["p1"]], subjects=[setup["english"]]
+        ),
+        "bola": add_teacher(db, "Bola Ade"),
+    }
+
+
+def test_admin_lists_teachers_with_assignments(db, api_client, admin, setup, staff):
+    response = api_client.get(URL, headers=admin)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert names(response) == ["Ada Obi", "Bola Ade", "Chidi Eze"]
+    assert (body["total"], body["limit"], body["offset"]) == (3, 20, 0)
+    ada, bola, _ = body["items"]
+    assert ada["phone"] == "0803" and ada["is_active"] is True
+    assert ada["classes"] == [
+        {"id": setup["p1"], "name": "Primary 1"},
+        {"id": setup["p2"], "name": "Primary 2"},
+    ]
+    assert ada["subjects"] == [{"id": setup["maths"], "name": "Mathematics"}]
+    assert bola["classes"] == [] and bola["subjects"] == []
+    assert "email" not in ada
+
+
+def test_empty_directory_is_a_valid_page(db, api_client, admin):
+    response = api_client.get(URL, headers=admin)
+
+    assert response.json() == {"items": [], "total": 0, "limit": 20, "offset": 0}
+
+
+def test_pagination_pages_do_not_overlap(db, api_client, admin, setup, staff):
+    # Same name: ordering falls back to id.
+    add_teacher(db, "Ada Obi", email="ada2@camdock.test")
+
+    seen = []
+    for offset in (0, 2, 4):
+        page = api_client.get(URL, headers=admin, params={"limit": 2, "offset": offset})
+        assert page.json()["total"] == 4
+        seen += [item["id"] for item in page.json()["items"]]
+
+    assert len(seen) == len(set(seen)) == 4
+    beyond = api_client.get(URL, headers=admin, params={"offset": 50})
+    assert beyond.json()["items"] == [] and beyond.json()["total"] == 4
+
+
+@pytest.mark.parametrize(
+    "params", [{"limit": 0}, {"limit": 101}, {"offset": -1}, {"q": "x" * 101}]
+)
+def test_out_of_range_parameters_are_rejected(db, api_client, admin, params):
+    assert api_client.get(URL, headers=admin, params=params).status_code == 422
+
+
+def test_search_is_case_insensitive_and_literal(db, api_client, admin, setup, staff):
+    add_teacher(db, "100%_Sure")
+
+    for q, expected in [
+        ("ada", ["Ada Obi"]),
+        ("  OBI ", ["Ada Obi"]),
+        ("nobody", []),
+        ("%", ["100%_Sure"]),
+        ("_", ["100%_Sure"]),
+    ]:
+        response = api_client.get(URL, headers=admin, params={"q": q})
+        assert names(response) == expected, q
+        assert response.json()["total"] == len(expected)
+
+
+def test_class_and_subject_filters(db, api_client, admin, setup, staff):
+    def listed(**params):
+        response = api_client.get(URL, headers=admin, params=params)
+        return names(response), response.json()["total"]
+
+    assert listed(class_id=setup["p1"]) == (["Ada Obi", "Chidi Eze"], 2)
+    assert listed(class_id=setup["p2"]) == (["Ada Obi"], 1)
+    assert listed(subject_id=setup["maths"]) == (["Ada Obi"], 1)
+    assert listed(class_id=setup["p1"], subject_id=setup["english"]) == (
+        ["Chidi Eze"],
+        1,
+    )
+    assert listed(class_id=setup["p2"], subject_id=setup["english"]) == ([], 0)
+    assert listed(class_id=99999) == ([], 0)
+
+
+def test_inactive_teachers_classes_and_subjects_are_hidden(
+    db, api_client, admin, setup, staff
+):
+    add_teacher(db, "Gone", active=False)
+    db.execute(
+        update(SchoolClass).where(SchoolClass.id == setup["p2"]).values(is_active=False)
+    )
+    db.execute(
+        update(Subject).where(Subject.id == setup["maths"]).values(is_active=False)
+    )
+
+    response = api_client.get(URL, headers=admin)
+
+    assert "Gone" not in names(response)
+    assert response.json()["total"] == 3
+    ada = response.json()["items"][0]
+    assert [c["id"] for c in ada["classes"]] == [setup["p1"]]
+    assert ada["subjects"] == []
+
+
+@pytest.mark.parametrize("role", ["teacher", "parent"])
+def test_other_roles_cannot_list_teachers(db, api_client, role):
+    _, headers = login_headers(db, api_client, role, f"{role}x@camdock.test")
+
+    assert api_client.get(URL, headers=headers).status_code == 403
+
+
+def test_anonymous_cannot_list_teachers(api_client):
+    assert api_client.get(URL).status_code == 401
+
+
+def test_listing_does_not_query_once_per_teacher(db, api_client, admin, setup):
+    for n in range(10):
+        add_teacher(
+            db, f"Teacher {n:02d}", classes=[setup["p1"]], subjects=[setup["maths"]]
+        )
+    statements = []
+
+    @event.listens_for(db, "before_cursor_execute")
+    def record(conn, cursor, statement, *args):
+        statements.append(statement)
+
+    api_client.get(URL, headers=admin, params={"limit": 2})
+    small = len(statements)
+    statements.clear()
+    api_client.get(URL, headers=admin, params={"limit": 10})
+
+    event.remove(db, "before_cursor_execute", record)
+    assert len(statements) == small
