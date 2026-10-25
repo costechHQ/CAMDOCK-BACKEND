@@ -72,6 +72,21 @@ uv run uvicorn app.main:create_app --factory --reload
 
 The app is created by a factory, so the `--factory` flag is required.
 
+## Create the first administrator
+
+No account exists after migrations, and no endpoint can create one. On the server, run:
+
+```bash
+uv run python -m app.cli create-admin --email head@school.example
+# Docker: docker compose run --rm api python -m app.cli create-admin --email head@school.example
+```
+
+The password is read from a hidden prompt (asked twice), or from the `CAMDOCK_ADMIN_PASSWORD`
+environment variable for non-interactive use. There is deliberately no `--password` option. A password
+needs at least 12 characters and must not be blank or equal to the email. The command refuses an
+email that already has an account and never changes an existing one. Each creation is recorded in
+the audit log.
+
 ## API conventions
 
 All errors use one JSON shape:

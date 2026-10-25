@@ -55,3 +55,32 @@ def test_token_hash_is_deterministic_hex_digest():
     assert re.fullmatch(r"[0-9a-f]{64}", digest)
     assert digest != token
     assert security.hash_token(token + "x") != digest
+
+
+# --- new-password policy -----------------------------------------------------------
+
+EMAIL = "head@school.test"
+
+
+def test_acceptable_password_passes():
+    security.validate_new_password("a perfectly fine passphrase", EMAIL)
+    security.validate_new_password("x" * security.PASSWORD_MIN_LENGTH, EMAIL)
+    security.validate_new_password("x" * security.PASSWORD_MAX_LENGTH, EMAIL)
+
+
+@pytest.mark.parametrize(
+    ("password", "fragment"),
+    [
+        ("", "blank"),
+        ("   " * 10, "blank"),
+        ("x" * (security.PASSWORD_MIN_LENGTH - 1), "at least 12"),
+        ("x" * (security.PASSWORD_MAX_LENGTH + 1), "at most 1024"),
+        (EMAIL, "email"),
+        (f"  {EMAIL.upper()}  ", "email"),
+    ],
+)
+def test_unacceptable_passwords_are_rejected(password, fragment):
+    with pytest.raises(security.PasswordPolicyError) as excinfo:
+        security.validate_new_password(password, EMAIL)
+    assert fragment in str(excinfo.value)
+    assert password.strip() == "" or password not in str(excinfo.value)
