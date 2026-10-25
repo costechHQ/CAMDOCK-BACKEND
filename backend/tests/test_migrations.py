@@ -26,7 +26,7 @@ from tests.support import assert_safe_test_database
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 SCRATCH_DATABASE = "camdock_migrations_test"
-REVISIONS = ["0001", "0002", "0003", "0004", "0005", "0006", "0007"]
+REVISIONS = ["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set; needs a Postgres test DB"
@@ -100,6 +100,22 @@ def test_upgrade_head_on_clean_database(clean_engine):
             text("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
         ).scalars()
         assert set(triggers) == {"audit_logs_append_only"}
+
+
+def test_student_number_sequence_is_created_and_dropped(clean_engine):
+    config = alembic_config()
+    query = text(
+        "SELECT sequencename FROM pg_sequences "
+        "WHERE sequencename = 'student_number_seq'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(query).scalars().all() == ["student_number_seq"]
+
+    command.downgrade(config, "0007")
+    with clean_engine.connect() as conn:
+        assert conn.execute(query).scalars().all() == []
 
 
 def test_migrated_schema_matches_models(clean_engine):
