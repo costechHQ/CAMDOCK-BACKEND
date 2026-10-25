@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -5,8 +6,10 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.errors import AppError
 from app.db.session import get_db
 from app.models import AuthSession, User
+from app.models.accounts import USER_ROLES
 from app.services import auth as auth_service
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -42,3 +45,24 @@ def get_current_user(
     context: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> User:
     return context.user
+
+
+def require_roles(*roles: str) -> Callable[..., User]:
+    """Dependency factory: authenticate first (401), then check the role (403).
+
+    There is no role hierarchy: list every role that may enter, admin included.
+    """
+    if not roles or not set(roles) <= set(USER_ROLES):
+        raise ValueError(f"require_roles needs one or more of {USER_ROLES}")
+    allowed = frozenset(roles)
+
+    def dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
+        if user.role not in allowed:
+            raise AppError(
+                "You do not have permission to perform this action.",
+                status_code=403,
+                code="forbidden",
+            )
+        return user
+
+    return dependency
