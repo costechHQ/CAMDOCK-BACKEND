@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.models import (
     ParentStudent,
+    Result,
     SchoolClass,
     Student,
     Teacher,
@@ -63,6 +64,30 @@ def class_scope(user: User) -> ColumnElement[bool]:
             TeacherClass.teacher_id == _teacher_id(user)
         )
         return SchoolClass.id.in_(assigned)
+    return false()
+
+
+def result_scope(user: User) -> ColumnElement[bool]:
+    """Filter on `Result` limiting rows to those the user may read.
+
+    A teacher needs both the result's recorded class and its subject assigned (the same
+    rule as `can_access_class_subject`); a parent reaches only linked children.
+    """
+    if user.role == "admin":
+        return true()
+    if user.role == "parent":
+        linked = select(ParentStudent.student_id).where(
+            ParentStudent.parent_user_id == user.id
+        )
+        return Result.student_id.in_(linked)
+    if user.role == "teacher":
+        classes = select(TeacherClass.class_id).where(
+            TeacherClass.teacher_id == _teacher_id(user)
+        )
+        subjects = select(TeacherSubject.subject_id).where(
+            TeacherSubject.teacher_id == _teacher_id(user)
+        )
+        return Result.class_id.in_(classes) & Result.subject_id.in_(subjects)
     return false()
 
 

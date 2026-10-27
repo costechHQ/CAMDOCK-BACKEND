@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies import get_current_user, require_roles
 from app.models import User
+from app.schemas.results import StudentResults
 from app.schemas.students import StudentCreate, StudentOut, StudentPage
+from app.services import results as result_service
 from app.services import students as student_service
 
 router = APIRouter(prefix="/students", tags=["students"])
@@ -45,3 +47,15 @@ def get_student(
     db: Annotated[Session, Depends(get_db)],
 ) -> StudentOut:
     return student_service.get_student(db, user, student_id)
+
+
+@router.get("/{student_id}/results")
+def get_student_results(
+    student_id: int,
+    term_id: Annotated[int, Query(ge=1)],
+    user: Annotated[User, Depends(require_roles("admin", "teacher", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> StudentResults:
+    """A student's scores for a term: all subjects for admins and linked parents, only
+    the caller's own subjects for teachers."""
+    return result_service.student_results(db, user, student_id, term_id)

@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -18,6 +18,8 @@ class Result(TimestampMixin, Base):
             name="uq_results_student_subject_term",
         ),
         CheckConstraint("score >= 0 AND score <= 100", name="score_range"),
+        # Class sheets and class averages filter on exactly these two columns.
+        Index("ix_results_term_id_class_id", "term_id", "class_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -1,11 +1,12 @@
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.models import (
+    AcademicYear,
     AuditLog,
     ClassSubject,
     Result,
@@ -14,8 +15,18 @@ from app.models import (
     Term,
     User,
 )
-from app.schemas.results import ResultOut, ResultWrite
+from app.schemas.results import (
+    ResultOut,
+    ResultPage,
+    ResultRow,
+    ResultWrite,
+    StudentRef,
+    StudentResults,
+    SubjectScore,
+    TermRef,
+)
 from app.services import access
+from app.services import students as student_service
 from app.services.grading import grade_for
 
 TWO_PLACES = Decimal("0.01")
@@ -34,6 +45,116 @@ def _to_out(result: Result) -> ResultOut:
         class_id=result.class_id,
         score=result.score,
         grade=grade_for(result.score),
+    )
+
+
+def _require_term(db: Session, term_id: int) -> TermRef:
+    row = db.execute(
+        select(Term.id, Term.name, AcademicYear.name)
+        .join(AcademicYear, AcademicYear.id == Term.academic_year_id)
+        .where(Term.id == term_id)
+    ).one_or_none()
+    if row is None:
+        raise _validation_error("Term not found.")
+    return TermRef(id=row[0], name=row[1], academic_year=row[2])
+
+
+def list_results(
+    db: Session,
+    user: User,
+    *,
+    term_id: int,
+    class_id: int | None,
+    subject_id: int | None,
+    limit: int,
+    offset: int,
+) -> ResultPage:
+    """Scores for a term, scoped in SQL, ordered by student name then subject name.
+    Results of inactive students are left out."""
+    _require_term(db, term_id)
+    conditions = [
+        Result.term_id == term_id,
+        Student.is_active.is_(True),
+        access.result_scope(user),
+    ]
+    if class_id is not None:
+        conditions.append(Result.class_id == class_id)
+    if subject_id is not None:
+        conditions.append(Result.subject_id == subject_id)
+    joined = (
+        select(Result, Student, Subject)
+        .join(Student, Student.id == Result.student_id)
+        .join(Subject, Subject.id == Result.subject_id)
+        .where(*conditions)
+    )
+
+    total = db.execute(
+        select(func.count()).select_from(joined.order_by(None).subquery())
+    ).scalar_one()
+    rows = db.execute(
+        joined.order_by(Student.full_name, Subject.name, Result.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return ResultPage(
+        items=[
+            ResultRow(
+                id=result.id,
+                student_id=student.id,
+                student_number=student.student_number,
+                student_name=student.full_name,
+                subject_id=subject.id,
+                subject_name=subject.name,
+                term_id=result.term_id,
+                class_id=result.class_id,
+                score=result.score,
+                grade=grade_for(result.score),
+            )
+            for result, student, subject in rows
+        ],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def student_results(
+    db: Session, user: User, student_id: int, term_id: int
+) -> StudentResults:
+    """A student's recorded scores for a term. Student scope comes first (the same 404
+    for missing and out-of-scope students); a teacher then sees only their subjects.
+    Subjects with no score are simply absent, never filled in as zero."""
+    student = student_service.get_student(db, user, student_id)
+    term = _require_term(db, term_id)
+    rows = db.execute(
+        select(Result, Subject)
+        .join(Subject, Subject.id == Result.subject_id)
+        .where(
+            Result.student_id == student.id,
+            Result.term_id == term.id,
+            access.result_scope(user),
+        )
+        .order_by(Subject.name, Result.id)
+    ).all()
+    return StudentResults(
+        student=StudentRef(
+            id=student.id,
+            student_number=student.student_number,
+            full_name=student.full_name,
+            class_id=student.class_id,
+            class_name=student.class_name,
+        ),
+        term=term,
+        items=[
+            SubjectScore(
+                result_id=result.id,
+                subject_id=subject.id,
+                subject_name=subject.name,
+                score=result.score,
+                grade=grade_for(result.score),
+            )
+            for result, subject in rows
+        ],
     )
 
 

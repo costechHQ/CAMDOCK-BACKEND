@@ -26,7 +26,17 @@ from tests.support import assert_safe_test_database
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 SCRATCH_DATABASE = "camdock_migrations_test"
-REVISIONS = ["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]
+REVISIONS = [
+    "0001",
+    "0002",
+    "0003",
+    "0004",
+    "0005",
+    "0006",
+    "0007",
+    "0008",
+    "0009",
+]
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set; needs a Postgres test DB"
@@ -114,6 +124,23 @@ def test_student_number_sequence_is_created_and_dropped(clean_engine):
         assert conn.execute(query).scalars().all() == ["student_number_seq"]
 
     command.downgrade(config, "0007")
+    with clean_engine.connect() as conn:
+        assert conn.execute(query).scalars().all() == []
+
+
+def test_results_term_class_index_is_created_and_dropped(clean_engine):
+    config = alembic_config()
+    query = text(
+        "SELECT indexdef FROM pg_indexes "
+        "WHERE tablename = 'results' AND indexname = 'ix_results_term_id_class_id'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        (definition,) = conn.execute(query).scalars().all()
+    assert "(term_id, class_id)" in definition
+
+    command.downgrade(config, "0008")
     with clean_engine.connect() as conn:
         assert conn.execute(query).scalars().all() == []
 

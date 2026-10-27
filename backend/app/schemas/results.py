@@ -29,6 +29,56 @@ class ResultWrite(BaseModel):
         return value
 
 
+class ResultRow(BaseModel):
+    """One score in a class sheet listing."""
+
+    id: int
+    student_id: int
+    student_number: str
+    student_name: str
+    subject_id: int
+    subject_name: str
+    term_id: int
+    class_id: int
+    score: Decimal
+    grade: str
+
+
+class ResultPage(BaseModel):
+    items: list[ResultRow]
+    total: int
+    limit: int
+    offset: int
+
+
+class StudentRef(BaseModel):
+    id: int
+    student_number: str
+    full_name: str
+    class_id: int
+    class_name: str
+
+
+class TermRef(BaseModel):
+    id: int
+    name: str
+    academic_year: str
+
+
+class SubjectScore(BaseModel):
+    result_id: int
+    subject_id: int
+    subject_name: str
+    score: Decimal
+    grade: str
+
+
+class StudentResults(BaseModel):
+    student: StudentRef
+    term: TermRef
+    items: list[SubjectScore]
+
+
 class ResultOut(BaseModel):
     id: int
     student_id: int
