@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies import get_current_user, require_roles
 from app.models import User
-from app.schemas.results import StudentResults
+from app.schemas.results import ResultSheet, StudentResults
 from app.schemas.students import StudentCreate, StudentOut, StudentPage
 from app.services import results as result_service
+from app.services import sheets as sheet_service
 from app.services import students as student_service
 
 router = APIRouter(prefix="/students", tags=["students"])
@@ -59,3 +60,15 @@ def get_student_results(
     """A student's scores for a term: all subjects for admins and linked parents, only
     the caller's own subjects for teachers."""
     return result_service.student_results(db, user, student_id, term_id)
+
+
+@router.get("/{student_id}/result-sheet")
+def get_result_sheet(
+    student_id: int,
+    term_id: Annotated[int, Query(ge=1)],
+    user: Annotated[User, Depends(require_roles("admin", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> ResultSheet:
+    """Printable term sheet with every subject. Admins and a student's linked parents
+    only: teachers see their own subjects through the student results endpoint."""
+    return sheet_service.result_sheet(db, user, student_id, term_id)

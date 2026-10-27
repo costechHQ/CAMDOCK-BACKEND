@@ -87,6 +87,40 @@ class ClassRef(BaseModel):
     name: str
 
 
+class SchoolInfo(BaseModel):
+    name: str
+    location: str
+
+
+class SheetStudent(BaseModel):
+    id: int
+    student_number: str
+    full_name: str
+
+
+class SheetSubject(BaseModel):
+    subject_id: int
+    subject_name: str
+    score: Decimal  # two decimal places
+    grade: str
+    class_average: Decimal  # one decimal place
+
+
+class ResultSheet(BaseModel):
+    """Everything FR-RES-009 lists, for the frontend to render and print."""
+
+    # Serialized as "class", which is a Python keyword.
+    model_config = ConfigDict(populate_by_name=True)
+
+    school: SchoolInfo
+    student: SheetStudent
+    school_class: ClassRef = Field(serialization_alias="class")
+    term: TermRef
+    subjects: list[SheetSubject]
+    subjects_recorded: int
+    overall_average: Decimal | None  # one decimal place; None with no scores
+
+
 class SubjectAverage(BaseModel):
     subject_id: int
     subject_name: str
