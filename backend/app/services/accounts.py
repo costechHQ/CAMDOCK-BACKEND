@@ -4,8 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_password, validate_new_password
+from app.core.errors import AppError
+from app.core.security import PasswordPolicyError, hash_password, validate_new_password
 from app.models import AuditLog, User
+from app.schemas.users import UserCreate
 
 EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 EMAIL_MAX_LENGTH = 254
@@ -22,33 +24,60 @@ def normalize_email(email: str) -> str:
     return email
 
 
-def create_admin(db: Session, email: str, password: str) -> User:
-    """Create an active administrator and record it in the audit log.
+class AccountConflict(AccountError):
+    """An account with that email already exists."""
 
-    Never changes an existing account. The caller owns the transaction.
-    """
+    def __init__(self) -> None:
+        super().__init__("An account with that email already exists.")
+
+
+def _create_account(
+    db: Session, email: str, password: str, role: str, actor_id: int | None
+) -> User:
+    """Create an active account and audit it. Never changes an existing account."""
     email = normalize_email(email)
     validate_new_password(password, email)
     if db.execute(select(User.id).where(User.email == email)).first() is not None:
-        raise AccountError("An account with that email already exists.")
+        raise AccountConflict
 
     user = User(
-        email=email, password_hash=hash_password(password), role="admin", is_active=True
+        email=email, password_hash=hash_password(password), role=role, is_active=True
     )
     try:
         with db.begin_nested():
             db.add(user)
             db.flush()
     except IntegrityError:  # lost a race with another creation of the same email
-        raise AccountError("An account with that email already exists.") from None
+        raise AccountConflict from None
     db.add(
         AuditLog(
-            actor_user_id=None,  # system action: no signed-in user
+            actor_user_id=actor_id,
             action="user.create",
             entity_type="user",
             entity_id=user.id,
-            changes={"email": email, "role": "admin"},
+            changes={"email": email, "role": role},
         )
     )
     db.flush()
     return user
+
+
+def create_admin(db: Session, email: str, password: str) -> User:
+    """Create an active administrator and record it in the audit log.
+
+    A system action with no signed-in user. The caller owns the transaction.
+    """
+    return _create_account(db, email, password, "admin", None)
+
+
+def create_user(db: Session, actor: User, data: UserCreate) -> User:
+    """Create a teacher or parent account on behalf of an administrator.
+
+    The caller owns the transaction.
+    """
+    try:
+        return _create_account(db, data.email, data.password, data.role, actor.id)
+    except AccountConflict as exc:
+        raise AppError(str(exc), status_code=409, code="conflict") from None
+    except (AccountError, PasswordPolicyError) as exc:
+        raise AppError(str(exc), status_code=422, code="validation_error") from None
