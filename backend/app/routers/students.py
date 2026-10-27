@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies import get_current_user, require_roles
 from app.models import User
+from app.schemas.parents import ParentLinkCreate, ParentLinkOut
 from app.schemas.results import ResultSheet, StudentResults
 from app.schemas.students import StudentCreate, StudentOut, StudentPage
+from app.services import parents as parent_service
 from app.services import results as result_service
 from app.services import sheets as sheet_service
 from app.services import students as student_service
@@ -60,6 +62,36 @@ def get_student_results(
     """A student's scores for a term: all subjects for admins and linked parents, only
     the caller's own subjects for teachers."""
     return result_service.student_results(db, user, student_id, term_id)
+
+
+@router.post("/{student_id}/parents", status_code=201)
+def link_parent(
+    student_id: int,
+    body: ParentLinkCreate,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> ParentLinkOut:
+    link = parent_service.link_parent(db, admin, student_id, body)
+    db.commit()
+    return link
+
+
+@router.get("/{student_id}/parents", dependencies=[Depends(require_roles("admin"))])
+def list_parents(
+    student_id: int, db: Annotated[Session, Depends(get_db)]
+) -> list[ParentLinkOut]:
+    return parent_service.list_parents(db, student_id)
+
+
+@router.delete("/{student_id}/parents/{parent_user_id}", status_code=204)
+def unlink_parent(
+    student_id: int,
+    parent_user_id: int,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> None:
+    parent_service.unlink_parent(db, admin, student_id, parent_user_id)
+    db.commit()
 
 
 @router.get("/{student_id}/result-sheet")

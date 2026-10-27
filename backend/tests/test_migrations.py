@@ -36,6 +36,7 @@ REVISIONS = [
     "0007",
     "0008",
     "0009",
+    "0010",
 ]
 
 pytestmark = pytest.mark.skipif(
@@ -143,6 +144,40 @@ def test_results_term_class_index_is_created_and_dropped(clean_engine):
     command.downgrade(config, "0008")
     with clean_engine.connect() as conn:
         assert conn.execute(query).scalars().all() == []
+
+
+def test_fee_numbering_and_uniqueness_are_created_and_dropped(clean_engine):
+    config = alembic_config()
+    sequences = text(
+        "SELECT sequencename FROM pg_sequences "
+        "WHERE sequencename IN ('fee_record_number_seq', 'fee_payment_number_seq') "
+        "ORDER BY sequencename"
+    )
+    constraint = text(
+        "SELECT conname FROM pg_constraint "
+        "WHERE conname = 'uq_fee_records_student_id_term_id_fee_type'"
+    )
+    index = text(
+        "SELECT indexname FROM pg_indexes "
+        "WHERE indexname = 'ix_fee_payments_fee_record_id'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(sequences).scalars().all() == [
+            "fee_payment_number_seq",
+            "fee_record_number_seq",
+        ]
+        assert conn.execute(constraint).scalars().all() == [
+            "uq_fee_records_student_id_term_id_fee_type"
+        ]
+        assert conn.execute(index).scalars().all() == ["ix_fee_payments_fee_record_id"]
+
+    command.downgrade(config, "0009")
+    with clean_engine.connect() as conn:
+        assert conn.execute(sequences).scalars().all() == []
+        assert conn.execute(constraint).scalars().all() == []
+        assert conn.execute(index).scalars().all() == []
 
 
 def test_migrated_schema_matches_models(clean_engine):
