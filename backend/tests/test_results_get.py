@@ -350,6 +350,8 @@ def test_admin_gets_a_students_scores_for_a_term(db, api_client, admin, school, 
             "name": "First Term",
             "academic_year": "2025/2026",
         },
+        "average": "67.8",
+        "subjects_recorded": 2,
         "items": [
             {
                 "result_id": scores["ada_english"],

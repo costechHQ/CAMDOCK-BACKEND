@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.models import (
-    AcademicYear,
     AuditLog,
     ClassSubject,
     Result,
@@ -23,11 +22,11 @@ from app.schemas.results import (
     StudentRef,
     StudentResults,
     SubjectScore,
-    TermRef,
 )
-from app.services import access
+from app.services import access, averages
 from app.services import students as student_service
 from app.services.grading import grade_for
+from app.services.terms import require_term
 
 TWO_PLACES = Decimal("0.01")
 
@@ -48,17 +47,6 @@ def _to_out(result: Result) -> ResultOut:
     )
 
 
-def _require_term(db: Session, term_id: int) -> TermRef:
-    row = db.execute(
-        select(Term.id, Term.name, AcademicYear.name)
-        .join(AcademicYear, AcademicYear.id == Term.academic_year_id)
-        .where(Term.id == term_id)
-    ).one_or_none()
-    if row is None:
-        raise _validation_error("Term not found.")
-    return TermRef(id=row[0], name=row[1], academic_year=row[2])
-
-
 def list_results(
     db: Session,
     user: User,
@@ -71,7 +59,7 @@ def list_results(
 ) -> ResultPage:
     """Scores for a term, scoped in SQL, ordered by student name then subject name.
     Results of inactive students are left out."""
-    _require_term(db, term_id)
+    require_term(db, term_id)
     conditions = [
         Result.term_id == term_id,
         Student.is_active.is_(True),
@@ -123,9 +111,11 @@ def student_results(
 ) -> StudentResults:
     """A student's recorded scores for a term. Student scope comes first (the same 404
     for missing and out-of-scope students); a teacher then sees only their subjects.
-    Subjects with no score are simply absent, never filled in as zero."""
+    Subjects with no score are simply absent, never filled in as zero. The average
+    covers every recorded subject for every viewer, so it is one consistent number."""
     student = student_service.get_student(db, user, student_id)
-    term = _require_term(db, term_id)
+    term = require_term(db, term_id)
+    average, recorded = averages.student_average(db, student.id, term.id)
     rows = db.execute(
         select(Result, Subject)
         .join(Subject, Subject.id == Result.subject_id)
@@ -145,6 +135,8 @@ def student_results(
             class_name=student.class_name,
         ),
         term=term,
+        average=average,
+        subjects_recorded=recorded,
         items=[
             SubjectScore(
                 result_id=result.id,

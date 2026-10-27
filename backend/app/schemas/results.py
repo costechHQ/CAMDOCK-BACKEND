@@ -76,7 +76,33 @@ class SubjectScore(BaseModel):
 class StudentResults(BaseModel):
     student: StudentRef
     term: TermRef
+    # Over every recorded subject, whatever part of it the caller may see in `items`.
+    average: Decimal | None  # one decimal place, e.g. "72.3"
+    subjects_recorded: int
     items: list[SubjectScore]
+
+
+class ClassRef(BaseModel):
+    id: int
+    name: str
+
+
+class SubjectAverage(BaseModel):
+    subject_id: int
+    subject_name: str
+    average: Decimal  # one decimal place
+    students_scored: int
+
+
+class ClassAverages(BaseModel):
+    # Serialized as "class", which is a Python keyword.
+    model_config = ConfigDict(populate_by_name=True)
+
+    school_class: ClassRef = Field(serialization_alias="class")
+    term: TermRef
+    students_with_results: int
+    subjects: list[SubjectAverage]
+    overall_average: Decimal | None
 
 
 class ResultOut(BaseModel):

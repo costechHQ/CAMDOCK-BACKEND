@@ -46,3 +46,10 @@ def mean(values: Iterable[Decimal]) -> Decimal | None:
     if not values:
         return None
     return sum(values, Decimal(0)) / len(values)
+
+
+def mean_from_sum(total: Decimal, count: int) -> Decimal | None:
+    """The same unrounded mean from an exact database SUM and COUNT."""
+    if count == 0:
+        return None
+    return total / count

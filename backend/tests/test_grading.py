@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.grading import grade_for, mean, round_average
+from app.services.grading import grade_for, mean, mean_from_sum, round_average
 
 D = Decimal
 
@@ -63,3 +63,13 @@ def test_mean_of_nothing_is_none_not_zero():
 def test_mean_is_exact_before_rounding():
     assert mean([D("70"), D("75.5"), D("80")]) == D("225.5") / 3
     assert round_average(mean([D("70"), D("75.5"), D("80")])) == D("75.2")
+
+
+def test_mean_from_sum_matches_mean():
+    values = [D("70"), D("75.5"), D("80")]
+
+    assert mean_from_sum(sum(values, D(0)), len(values)) == mean(values)
+
+
+def test_mean_from_sum_of_nothing_is_none_not_zero():
+    assert mean_from_sum(D(0), 0) is None
