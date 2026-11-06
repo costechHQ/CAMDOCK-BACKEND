@@ -173,6 +173,20 @@ def payment_receipt(db: Session, user: User, fee_id: int, payment_id: int) -> Re
     raise AppError("Payment not found.", status_code=404, code="not_found")
 
 
+def paid_per_fee_subquery():
+    """The sum of payments per bill, and the column to use for it (0 when unpaid).
+    Shared by the fee list and the dashboard so both total money the same way."""
+    paid_per_fee = (
+        select(
+            FeePayment.fee_record_id.label("fee_id"),
+            func.sum(FeePayment.amount).label("paid"),
+        )
+        .group_by(FeePayment.fee_record_id)
+        .subquery()
+    )
+    return paid_per_fee, func.coalesce(paid_per_fee.c.paid, 0)
+
+
 def list_fees(
     db: Session,
     user: User,
@@ -187,15 +201,7 @@ def list_fees(
 ) -> FeePage:
     """Bills the user may see, scoped in SQL, newest first. Bills of deactivated
     students stay visible. `totals` cover the whole filtered set."""
-    paid_per_fee = (
-        select(
-            FeePayment.fee_record_id.label("fee_id"),
-            func.sum(FeePayment.amount).label("paid"),
-        )
-        .group_by(FeePayment.fee_record_id)
-        .subquery()
-    )
-    paid = func.coalesce(paid_per_fee.c.paid, 0)
+    paid_per_fee, paid = paid_per_fee_subquery()
 
     conditions = [access.student_scope(user)]
     if student_id is not None:
