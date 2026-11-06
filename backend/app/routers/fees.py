@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies import require_roles
 from app.models import User
-from app.schemas.fees import FeeCreate, FeeOut
+from app.schemas.fees import FeeCreate, FeeOut, PaymentCreate, PaymentResult
 from app.services import fees as fee_service
 
 router = APIRouter(prefix="/fees", tags=["fees"])
@@ -23,3 +23,16 @@ def create_fee(
     fee = fee_service.create_fee(db, admin, body)
     db.commit()
     return fee
+
+
+@router.post("/{fee_id}/payments", status_code=201)
+def add_payment(
+    fee_id: int,
+    body: PaymentCreate,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> PaymentResult:
+    """Record an instalment. A payment that would exceed the amount billed is refused."""
+    result = fee_service.add_payment(db, admin, fee_id, body)
+    db.commit()
+    return result

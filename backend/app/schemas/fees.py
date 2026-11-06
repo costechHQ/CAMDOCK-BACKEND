@@ -93,5 +93,18 @@ class FeeOut(BaseModel):
     payments: list[PaymentOut]
 
 
+class PaymentCreate(BaseModel):
+    """An instalment on an existing bill. The receipt number and date are server-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount: Amount
+
+
+class PaymentResult(BaseModel):
+    payment: PaymentOut
+    fee: FeeOut
+
+
 class FeeTypes(BaseModel):
     items: list[str]

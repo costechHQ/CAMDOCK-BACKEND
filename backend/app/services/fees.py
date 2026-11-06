@@ -15,7 +15,14 @@ from app.models import (
     Term,
     User,
 )
-from app.schemas.fees import FeeCreate, FeeOut, FeeStudent, PaymentOut
+from app.schemas.fees import (
+    FeeCreate,
+    FeeOut,
+    FeeStudent,
+    PaymentCreate,
+    PaymentOut,
+    PaymentResult,
+)
 from app.schemas.results import TermRef
 from app.services import money
 from app.services.terms import require_term
@@ -95,6 +102,72 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
             for p in payments
         ],
     )
+
+
+def _paid_total(db: Session, fee_id: int) -> Decimal:
+    return db.execute(
+        select(func.coalesce(func.sum(FeePayment.amount), 0)).where(
+            FeePayment.fee_record_id == fee_id
+        )
+    ).scalar_one()
+
+
+def add_payment(
+    db: Session, actor: User, fee_id: int, data: PaymentCreate
+) -> PaymentResult:
+    """Record an instalment against a bill and audit it; overpayment is refused.
+
+    The bill row is locked before the paid total is read, so two simultaneous payments
+    queue: the second sees the first's total and cannot push the sum past the amount
+    billed. The caller owns the transaction (the lock lasts until it ends).
+    """
+    fee = db.execute(
+        select(FeeRecord).where(FeeRecord.id == fee_id).with_for_update()
+    ).scalar_one_or_none()
+    if fee is None:
+        raise AppError("Fee record not found.", status_code=404, code="not_found")
+
+    amount = money.quantize(data.amount)
+    outstanding = money.quantize(fee.amount_billed) - money.quantize(
+        _paid_total(db, fee.id)
+    )
+    if outstanding <= 0:
+        raise _payment_error("This fee has already been paid in full.")
+    if amount > outstanding:
+        raise _payment_error(
+            f"Payment of {amount} exceeds the outstanding balance of {outstanding}."
+        )
+
+    payment = FeePayment(
+        fee_record_id=fee.id,
+        amount=amount,
+        receipt_number=next_payment_number(db),
+        created_by=actor.id,
+    )
+    db.add(payment)
+    db.flush()
+    db.add(
+        AuditLog(
+            actor_user_id=actor.id,
+            action="fee.payment.create",
+            entity_type="fee_payment",
+            entity_id=payment.id,
+            changes={
+                "fee_record_id": fee.id,
+                "amount": str(amount),
+                "receipt_number": payment.receipt_number,
+            },
+        )
+    )
+    db.flush()
+    loaded = load_fee(db, fee.id)
+    return PaymentResult(
+        payment=next(p for p in loaded.payments if p.id == payment.id), fee=loaded
+    )
+
+
+def _payment_error(message: str) -> AppError:
+    return AppError(message, status_code=422, code="validation_error")
 
 
 def create_fee(db: Session, actor: User, data: FeeCreate) -> FeeOut:
