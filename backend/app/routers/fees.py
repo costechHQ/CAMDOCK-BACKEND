@@ -1,15 +1,60 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.dependencies import require_roles
 from app.models import User
-from app.schemas.fees import FeeCreate, FeeOut, PaymentCreate, PaymentResult
+from app.schemas.fees import (
+    FeeCreate,
+    FeeOut,
+    FeePage,
+    FeeStatus,
+    FeeType,
+    PaymentCreate,
+    PaymentResult,
+)
 from app.services import fees as fee_service
 
 router = APIRouter(prefix="/fees", tags=["fees"])
+
+
+@router.get("")
+def list_fees(
+    user: Annotated[User, Depends(require_roles("admin", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+    student_id: Annotated[int | None, Query(ge=1)] = None,
+    term_id: Annotated[int | None, Query(ge=1)] = None,
+    class_id: Annotated[int | None, Query(ge=1)] = None,
+    fee_type: FeeType | None = None,
+    status: FeeStatus | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> FeePage:
+    """Admins see every bill; parents only their linked children's. `totals` cover all
+    bills matching the filters, not just this page."""
+    return fee_service.list_fees(
+        db,
+        user,
+        student_id=student_id,
+        term_id=term_id,
+        class_id=class_id,
+        fee_type=fee_type,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/{fee_id}")
+def get_fee(
+    fee_id: int,
+    user: Annotated[User, Depends(require_roles("admin", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> FeeOut:
+    """One bill with its payments; a parent only gets their own child's."""
+    return fee_service.get_fee(db, user, fee_id)
 
 
 @router.post("", status_code=201)

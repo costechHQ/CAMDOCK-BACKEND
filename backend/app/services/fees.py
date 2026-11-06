@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -18,13 +18,16 @@ from app.models import (
 from app.schemas.fees import (
     FeeCreate,
     FeeOut,
+    FeePage,
     FeeStudent,
+    FeeSummary,
+    FeeTotals,
     PaymentCreate,
     PaymentOut,
     PaymentResult,
 )
 from app.schemas.results import TermRef
-from app.services import money
+from app.services import access, money
 from app.services.terms import require_term
 
 BILL_UNIQUE = "uq_fee_records_student_id_term_id_fee_type"
@@ -57,6 +60,126 @@ def _is_billed(db: Session, student_id: int, term_id: int, fee_type: str) -> boo
     )
 
 
+def _summary_fields(
+    fee: FeeRecord, student: Student, term: Term, year: str, paid: Decimal
+) -> dict:
+    """The fields every fee response shares; status and balance only from `money`."""
+    billed = money.quantize(fee.amount_billed)
+    paid = money.quantize(paid)
+    return {
+        "id": fee.id,
+        "receipt_number": fee.receipt_number,
+        "student": FeeStudent(
+            id=student.id,
+            student_number=student.student_number,
+            full_name=student.full_name,
+        ),
+        "term": TermRef(id=term.id, name=term.name, academic_year=year),
+        "fee_type": fee.fee_type,
+        "amount_billed": billed,
+        "amount_paid": paid,
+        "balance": money.quantize(money.balance(billed, paid)),
+        "status": money.status(billed, paid),
+        "recorded_at": fee.recorded_at,
+    }
+
+
+def get_fee(db: Session, user: User, fee_id: int) -> FeeOut:
+    """One bill the user may see; a missing bill and another family's bill give the
+    same 404."""
+    visible = db.execute(
+        select(FeeRecord.id)
+        .join(Student, Student.id == FeeRecord.student_id)
+        .where(FeeRecord.id == fee_id, access.student_scope(user))
+    ).scalar_one_or_none()
+    if visible is None:
+        raise AppError("Fee record not found.", status_code=404, code="not_found")
+    return load_fee(db, visible)
+
+
+def list_fees(
+    db: Session,
+    user: User,
+    *,
+    student_id: int | None,
+    term_id: int | None,
+    class_id: int | None,
+    fee_type: str | None,
+    status: str | None,
+    limit: int,
+    offset: int,
+) -> FeePage:
+    """Bills the user may see, scoped in SQL, newest first. Bills of deactivated
+    students stay visible. `totals` cover the whole filtered set."""
+    paid_per_fee = (
+        select(
+            FeePayment.fee_record_id.label("fee_id"),
+            func.sum(FeePayment.amount).label("paid"),
+        )
+        .group_by(FeePayment.fee_record_id)
+        .subquery()
+    )
+    paid = func.coalesce(paid_per_fee.c.paid, 0)
+
+    conditions = [access.student_scope(user)]
+    if student_id is not None:
+        conditions.append(FeeRecord.student_id == student_id)
+    if term_id is not None:
+        conditions.append(FeeRecord.term_id == term_id)
+    if class_id is not None:
+        conditions.append(Student.class_id == class_id)
+    if fee_type is not None:
+        conditions.append(FeeRecord.fee_type == fee_type)
+    if status is not None:
+        # The same three rules as `money.status`, as SQL so the filter can page.
+        conditions.append(
+            {
+                money.PAID: paid >= FeeRecord.amount_billed,
+                money.DUE: paid == 0,
+                money.PARTIAL: and_(paid > 0, paid < FeeRecord.amount_billed),
+            }[status]
+        )
+
+    def joined(statement):
+        return (
+            statement.select_from(FeeRecord)
+            .join(Student, Student.id == FeeRecord.student_id)
+            .join(Term, Term.id == FeeRecord.term_id)
+            .join(AcademicYear, AcademicYear.id == Term.academic_year_id)
+            .outerjoin(paid_per_fee, paid_per_fee.c.fee_id == FeeRecord.id)
+            .where(*conditions)
+        )
+
+    total, billed_sum, paid_sum = db.execute(
+        joined(
+            select(
+                func.count(),
+                func.coalesce(func.sum(FeeRecord.amount_billed), 0),
+                func.coalesce(func.sum(paid), 0),
+            )
+        )
+    ).one()
+    rows = db.execute(
+        joined(select(FeeRecord, Student, Term, AcademicYear.name, paid))
+        .order_by(FeeRecord.recorded_at.desc(), FeeRecord.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    billed_sum, paid_sum = money.quantize(billed_sum), money.quantize(paid_sum)
+    return FeePage(
+        items=[
+            FeeSummary(**_summary_fields(fee, student, term, year, fee_paid))
+            for fee, student, term, year, fee_paid in rows
+        ],
+        total=total,
+        limit=limit,
+        offset=offset,
+        totals=FeeTotals(
+            billed=billed_sum, paid=paid_sum, balance=billed_sum - paid_sum
+        ),
+    )
+
+
 def load_fee(db: Session, fee_id: int) -> FeeOut:
     """One bill with its student, term and payments, as the API presents it."""
     fee, student, term, year = db.execute(
@@ -75,23 +198,9 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
         .scalars()
         .all()
     )
-    billed = money.quantize(fee.amount_billed)
-    paid = money.quantize(sum((p.amount for p in payments), Decimal(0)))
+    paid = sum((p.amount for p in payments), Decimal(0))
     return FeeOut(
-        id=fee.id,
-        receipt_number=fee.receipt_number,
-        student=FeeStudent(
-            id=student.id,
-            student_number=student.student_number,
-            full_name=student.full_name,
-        ),
-        term=TermRef(id=term.id, name=term.name, academic_year=year),
-        fee_type=fee.fee_type,
-        amount_billed=billed,
-        amount_paid=paid,
-        balance=money.quantize(money.balance(billed, paid)),
-        status=money.status(billed, paid),
-        recorded_at=fee.recorded_at,
+        **_summary_fields(fee, student, term, year, paid),
         payments=[
             PaymentOut(
                 id=p.id,

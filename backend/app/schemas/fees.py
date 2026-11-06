@@ -76,8 +76,11 @@ class PaymentOut(BaseModel):
     paid_at: datetime
 
 
-class FeeOut(BaseModel):
-    """A bill with what has been paid against it. `amount_paid` is the sum of the
+FeeStatus = Literal["paid", "partial", "due"]
+
+
+class FeeSummary(BaseModel):
+    """A bill and what has been paid against it. `amount_paid` is the sum of the
     payments, never stored; `balance` and `status` come from `services.money`."""
 
     id: int
@@ -88,9 +91,30 @@ class FeeOut(BaseModel):
     amount_billed: Decimal  # two decimal places
     amount_paid: Decimal
     balance: Decimal
-    status: Literal["paid", "partial", "due"]
+    status: FeeStatus
     recorded_at: datetime
+
+
+class FeeOut(FeeSummary):
+    """A bill with its instalments, oldest first."""
+
     payments: list[PaymentOut]
+
+
+class FeeTotals(BaseModel):
+    """Sums over every bill matching the filters, not just the current page."""
+
+    billed: Decimal
+    paid: Decimal
+    balance: Decimal
+
+
+class FeePage(BaseModel):
+    items: list[FeeSummary]
+    total: int
+    limit: int
+    offset: int
+    totals: FeeTotals
 
 
 class PaymentCreate(BaseModel):
