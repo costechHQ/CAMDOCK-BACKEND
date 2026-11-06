@@ -207,11 +207,9 @@ def test_bills_of_a_deactivated_student_still_count(db, api_client, admin, schoo
 # --- access -------------------------------------------------------------------------
 
 
-def test_teachers_parents_and_anonymous_users_are_refused(db, api_client, admin_login):
-    teacher = login_headers(db, api_client, "teacher")[1]
+def test_parents_and_anonymous_users_are_refused(db, api_client, admin_login):
     parent = login_headers(db, api_client, "parent")[1]
 
-    assert overview(api_client, teacher).status_code == 403
     assert overview(api_client, parent).status_code == 403
     assert api_client.get(URL).status_code == 401
 

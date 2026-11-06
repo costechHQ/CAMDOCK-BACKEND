@@ -21,6 +21,8 @@ from app.schemas.dashboard import (
     FeeAmounts,
     FeesByPeriod,
     PublicStats,
+    TeacherClassEntry,
+    TeacherOverview,
 )
 from app.schemas.results import ClassRef, TermRef
 from app.services import access, money
@@ -169,3 +171,42 @@ def admin_overview(db: Session, user: User, term_id: int | None) -> AdminOvervie
             for class_id, name in classes
         ],
     )
+
+
+def teacher_overview(db: Session, user: User, term_id: int | None) -> TeacherOverview:
+    """ "My overview" (SRS FR-DASH-002): the teacher's assigned active classes with
+    their active student counts and overall averages for the term. Nothing school-wide
+    and no fees."""
+    term = resolve_term(db, term_id)
+    classes = db.execute(
+        select(SchoolClass.id, SchoolClass.name, func.count(Student.id))
+        .outerjoin(
+            Student,
+            (Student.class_id == SchoolClass.id) & Student.is_active.is_(True),
+        )
+        .where(SchoolClass.is_active.is_(True), access.class_scope(user))
+        .group_by(SchoolClass.id, SchoolClass.name)
+        .order_by(SchoolClass.name, SchoolClass.id)
+    ).all()
+    averages = class_overall_averages(db, user, term.id) if term is not None else {}
+    return TeacherOverview(
+        term=term,
+        students=sum(row[2] for row in classes),
+        classes=[
+            TeacherClassEntry(
+                school_class=ClassRef(id=class_id, name=name),
+                students=students,
+                overall_average=averages.get(class_id),
+            )
+            for class_id, name, students in classes
+        ],
+    )
+
+
+def overview(
+    db: Session, user: User, term_id: int | None
+) -> AdminOverview | TeacherOverview:
+    """The overview for the caller's role."""
+    if user.role == "teacher":
+        return teacher_overview(db, user, term_id)
+    return admin_overview(db, user, term_id)
