@@ -12,7 +12,7 @@ from pydantic import (
 )
 
 from app.models.fees import FEE_TYPES
-from app.schemas.results import TermRef
+from app.schemas.results import SchoolInfo, TermRef
 
 MAX_AMOUNT = Decimal("9999999999.99")  # the NUMERIC(12,2) column limit
 RecordId = Annotated[StrictInt, Field(ge=1)]
@@ -128,6 +128,40 @@ class PaymentCreate(BaseModel):
 class PaymentResult(BaseModel):
     payment: PaymentOut
     fee: FeeOut
+
+
+class ReceiptStudent(BaseModel):
+    id: int
+    student_number: str
+    full_name: str
+    class_name: str  # the student's current class: bills do not store one
+
+
+class ReceiptSignatures(BaseModel):
+    """Labels only: the frontend draws blank signature and stamp boxes to print."""
+
+    bursar_label: str = "Bursar"
+    stamp_label: str = "School stamp"
+
+
+class Receipt(BaseModel):
+    """Printable receipt data (SRS FR-FEE-008). A bill receipt is numbered and dated
+    like the bill; an instalment receipt (`payment` set) like that payment, with the
+    figures as they stood once it was recorded."""
+
+    school: SchoolInfo
+    receipt_number: str
+    date: datetime
+    student: ReceiptStudent
+    term: TermRef
+    fee_type: str
+    amount_billed: Decimal  # two decimal places
+    amount_paid: Decimal
+    balance: Decimal
+    status: FeeStatus
+    payment: PaymentOut | None = None
+    payments: list[PaymentOut]
+    signatures: ReceiptSignatures
 
 
 class FeeTypes(BaseModel):

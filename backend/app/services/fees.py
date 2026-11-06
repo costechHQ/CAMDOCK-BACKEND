@@ -1,16 +1,18 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models import (
     AcademicYear,
     AuditLog,
     FeePayment,
     FeeRecord,
+    SchoolClass,
     Student,
     Term,
     User,
@@ -25,8 +27,11 @@ from app.schemas.fees import (
     PaymentCreate,
     PaymentOut,
     PaymentResult,
+    Receipt,
+    ReceiptSignatures,
+    ReceiptStudent,
 )
-from app.schemas.results import TermRef
+from app.schemas.results import SchoolInfo, TermRef
 from app.services import access, money
 from app.services.terms import require_term
 
@@ -95,6 +100,77 @@ def get_fee(db: Session, user: User, fee_id: int) -> FeeOut:
     if visible is None:
         raise AppError("Fee record not found.", status_code=404, code="not_found")
     return load_fee(db, visible)
+
+
+def _receipt(
+    db: Session,
+    fee: FeeOut,
+    payments: list[PaymentOut],
+    *,
+    receipt_number: str,
+    issued: datetime,
+    payment: PaymentOut | None,
+) -> Receipt:
+    """A receipt over `payments`, the instalments counted so far; status and balance
+    come from `money` like every other fee response."""
+    class_name = db.execute(
+        select(SchoolClass.name)
+        .join(Student, Student.class_id == SchoolClass.id)
+        .where(Student.id == fee.student.id)
+    ).scalar_one()
+    settings = get_settings()
+    paid = money.quantize(sum((p.amount for p in payments), Decimal(0)))
+    return Receipt(
+        school=SchoolInfo(name=settings.school_name, location=settings.school_location),
+        receipt_number=receipt_number,
+        date=issued,
+        student=ReceiptStudent(
+            id=fee.student.id,
+            student_number=fee.student.student_number,
+            full_name=fee.student.full_name,
+            class_name=class_name,
+        ),
+        term=fee.term,
+        fee_type=fee.fee_type,
+        amount_billed=fee.amount_billed,
+        amount_paid=paid,
+        balance=money.quantize(money.balance(fee.amount_billed, paid)),
+        status=money.status(fee.amount_billed, paid),
+        payment=payment,
+        payments=payments,
+        signatures=ReceiptSignatures(),
+    )
+
+
+def bill_receipt(db: Session, user: User, fee_id: int) -> Receipt:
+    """The receipt for a bill and every instalment so far. Bills the user may not see
+    give the same 404 as a missing one."""
+    fee = get_fee(db, user, fee_id)
+    return _receipt(
+        db,
+        fee,
+        fee.payments,
+        receipt_number=fee.receipt_number,
+        issued=fee.recorded_at,
+        payment=None,
+    )
+
+
+def payment_receipt(db: Session, user: User, fee_id: int, payment_id: int) -> Receipt:
+    """The receipt for one instalment, with the figures as they stood once it was
+    recorded. A payment of another bill is a 404 like any unknown one."""
+    fee = get_fee(db, user, fee_id)
+    for index, payment in enumerate(fee.payments):
+        if payment.id == payment_id:
+            return _receipt(
+                db,
+                fee,
+                fee.payments[: index + 1],
+                receipt_number=payment.receipt_number,
+                issued=payment.paid_at,
+                payment=payment,
+            )
+    raise AppError("Payment not found.", status_code=404, code="not_found")
 
 
 def list_fees(

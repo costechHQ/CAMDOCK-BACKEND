@@ -14,6 +14,7 @@ from app.schemas.fees import (
     FeeType,
     PaymentCreate,
     PaymentResult,
+    Receipt,
 )
 from app.services import fees as fee_service
 
@@ -55,6 +56,27 @@ def get_fee(
 ) -> FeeOut:
     """One bill with its payments; a parent only gets their own child's."""
     return fee_service.get_fee(db, user, fee_id)
+
+
+@router.get("/{fee_id}/receipt")
+def get_receipt(
+    fee_id: int,
+    user: Annotated[User, Depends(require_roles("admin", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> Receipt:
+    """Printable receipt data for a bill; a parent only gets their own child's."""
+    return fee_service.bill_receipt(db, user, fee_id)
+
+
+@router.get("/{fee_id}/payments/{payment_id}/receipt")
+def get_payment_receipt(
+    fee_id: int,
+    payment_id: int,
+    user: Annotated[User, Depends(require_roles("admin", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> Receipt:
+    """Receipt for one instalment, with the figures as they stood once it was paid."""
+    return fee_service.payment_receipt(db, user, fee_id, payment_id)
 
 
 @router.post("", status_code=201)
