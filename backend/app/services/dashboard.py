@@ -15,8 +15,14 @@ from app.models import (
     User,
 )
 from app.models.academic import TERM_NAMES
-from app.schemas.dashboard import FeeAmounts, PublicStats
-from app.schemas.results import TermRef
+from app.schemas.dashboard import (
+    AdminOverview,
+    ClassAverageEntry,
+    FeeAmounts,
+    FeesByPeriod,
+    PublicStats,
+)
+from app.schemas.results import ClassRef, TermRef
 from app.services import access, money
 from app.services.fees import paid_per_fee_subquery
 from app.services.grading import mean, mean_from_sum, round_average
@@ -128,3 +134,38 @@ def class_overall_averages(
         class_id: None if (overall := mean(values)) is None else round_average(overall)
         for class_id, values in subject_means.items()
     }
+
+
+def admin_overview(db: Session, user: User, term_id: int | None) -> AdminOverview:
+    """The admin dashboard (SRS FR-DASH-002): school-wide counts, fees for the term
+    and for all time, and each active class's overall average for the term."""
+    term = resolve_term(db, term_id)
+    counts = public_stats(db)
+    occupied = db.execute(
+        select(func.count(func.distinct(SchoolClass.id)))
+        .join(Student, Student.class_id == SchoolClass.id)
+        .where(SchoolClass.is_active.is_(True), Student.is_active.is_(True))
+    ).scalar_one()
+    classes = db.execute(
+        select(SchoolClass.id, SchoolClass.name)
+        .where(SchoolClass.is_active.is_(True), access.class_scope(user))
+        .order_by(SchoolClass.name, SchoolClass.id)
+    ).all()
+    averages = class_overall_averages(db, user, term.id) if term is not None else {}
+    return AdminOverview(
+        term=term,
+        students=counts.students,
+        teachers=counts.teachers,
+        active_classes=occupied,
+        fees=FeesByPeriod(
+            term=None if term is None else fee_totals(db, FeeRecord.term_id == term.id),
+            all_time=fee_totals(db),
+        ),
+        class_averages=[
+            ClassAverageEntry(
+                school_class=ClassRef(id=class_id, name=name),
+                overall_average=averages.get(class_id),
+            )
+            for class_id, name in classes
+        ],
+    )

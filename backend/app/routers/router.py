@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.routers import (
     auth,
     classes,
+    dashboard,
     fee_types,
     fees,
     health,
@@ -18,6 +19,7 @@ from app.routers import (
 api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(classes.router)
+api_router.include_router(dashboard.router)
 api_router.include_router(fee_types.router)
 api_router.include_router(fees.router)
 api_router.include_router(health.router)
