@@ -6,6 +6,7 @@ from app.routers import (
     fee_types,
     fees,
     health,
+    public,
     results,
     students,
     subjects,
@@ -20,6 +21,7 @@ api_router.include_router(classes.router)
 api_router.include_router(fee_types.router)
 api_router.include_router(fees.router)
 api_router.include_router(health.router)
+api_router.include_router(public.router)
 api_router.include_router(results.router)
 api_router.include_router(students.router)
 api_router.include_router(subjects.router)

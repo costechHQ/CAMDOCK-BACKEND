@@ -39,7 +39,11 @@ from tests.test_auth_api import (
     login_token,
 )
 
-PUBLIC_ROUTES = {("get", "/api/v1/health"), ("post", "/api/v1/auth/login")}
+PUBLIC_ROUTES = {
+    ("get", "/api/v1/health"),
+    ("get", "/api/v1/public/stats"),
+    ("post", "/api/v1/auth/login"),
+}
 
 probe_router = APIRouter(prefix="/_acc")
 

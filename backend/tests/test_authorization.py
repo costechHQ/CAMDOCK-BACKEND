@@ -106,7 +106,11 @@ def test_require_roles_rejects_bad_arguments(roles):
         require_roles(*roles)
 
 
-PUBLIC_ROUTES = {("get", "/api/v1/health"), ("post", "/api/v1/auth/login")}
+PUBLIC_ROUTES = {
+    ("get", "/api/v1/health"),
+    ("get", "/api/v1/public/stats"),
+    ("post", "/api/v1/auth/login"),
+}
 
 
 def test_every_route_requires_authentication_unless_allowlisted(make_client):
