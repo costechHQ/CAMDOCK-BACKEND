@@ -180,10 +180,8 @@ def test_a_bad_term_is_rejected(db, api_client, school, value):
     assert response.status_code == 422
 
 
-def test_parents_and_anonymous_users_are_still_refused(db, api_client, school):
-    parent = login_headers(db, api_client, "parent")[1]
+def test_anonymous_users_are_still_refused(db, api_client, school):
 
-    assert overview(api_client, parent).status_code == 403
     assert api_client.get(URL).status_code == 401
 
 
@@ -224,7 +222,7 @@ def test_an_admin_still_gets_the_admin_shape(db, api_client, admin, school):
     assert "title" not in body
 
 
-def test_openapi_documents_both_shapes(db, api_client):
+def test_openapi_documents_every_shape(db, api_client):
     schema = api_client.app.openapi()
     response = schema["paths"]["/api/v1/dashboard/overview"]["get"]["responses"]["200"]
     refs = {
@@ -232,7 +230,7 @@ def test_openapi_documents_both_shapes(db, api_client):
         for option in response["content"]["application/json"]["schema"]["oneOf"]
     }
 
-    assert refs == {"AdminOverview", "TeacherOverview"}
+    assert refs == {"AdminOverview", "TeacherOverview", "ParentOverview"}
 
 
 def test_no_secrets_and_no_audit_rows(db, api_client, school):

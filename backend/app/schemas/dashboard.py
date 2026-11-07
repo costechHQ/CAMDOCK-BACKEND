@@ -61,3 +61,32 @@ class TeacherOverview(BaseModel):
     term: TermRef | None
     students: int  # active students across the assigned classes
     classes: list[TeacherClassEntry]
+
+
+class ChildRef(BaseModel):
+    id: int
+    student_number: str
+    full_name: str
+
+
+class ChildLinks(BaseModel):
+    """API paths for the frontend to follow (SRS FR-DASH-003)."""
+
+    results: str
+    fees: str
+
+
+class ParentChild(BaseModel):
+    student: ChildRef
+    school_class: ClassRef
+    student_average: Decimal | None  # one decimal place; None when nothing is recorded
+    class_average: Decimal | None
+    subjects_recorded: int
+    fees: FeesByPeriod
+    links: ChildLinks
+
+
+class ParentOverview(BaseModel):
+    role: Literal["parent"] = "parent"
+    term: TermRef | None
+    children: list[ParentChild]

@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 
@@ -17,9 +18,13 @@ from app.models import (
 from app.models.academic import TERM_NAMES
 from app.schemas.dashboard import (
     AdminOverview,
+    ChildLinks,
+    ChildRef,
     ClassAverageEntry,
     FeeAmounts,
     FeesByPeriod,
+    ParentChild,
+    ParentOverview,
     PublicStats,
     TeacherClassEntry,
     TeacherOverview,
@@ -119,6 +124,12 @@ def class_overall_averages(
             SchoolClass.is_active.is_(True), access.class_scope(user)
         )
     ).scalars()
+    return _overall_averages(db, term_id, class_ids)
+
+
+def _overall_averages(
+    db: Session, term_id: int, class_ids: Iterable[int]
+) -> dict[int, Decimal | None]:
     subject_means: dict[int, list[Decimal]] = {class_id: [] for class_id in class_ids}
     rows = db.execute(
         select(Result.class_id, func.sum(Result.score), func.count())
@@ -205,8 +216,123 @@ def teacher_overview(db: Session, user: User, term_id: int | None) -> TeacherOve
 
 def overview(
     db: Session, user: User, term_id: int | None
-) -> AdminOverview | TeacherOverview:
+) -> AdminOverview | TeacherOverview | ParentOverview:
     """The overview for the caller's role."""
     if user.role == "teacher":
         return teacher_overview(db, user, term_id)
+    if user.role == "parent":
+        return parent_overview(db, user, term_id)
     return admin_overview(db, user, term_id)
+
+
+def _student_averages(
+    db: Session, student_ids: list[int], term_id: int
+) -> dict[int, tuple[Decimal | None, int]]:
+    """Each student's average and recorded-subject count for the term, in one query;
+    the same rule as `averages.student_average`."""
+    rows = db.execute(
+        select(Result.student_id, func.sum(Result.score), func.count())
+        .where(Result.student_id.in_(student_ids), Result.term_id == term_id)
+        .group_by(Result.student_id)
+    ).all()
+    found = {}
+    for student_id, total, count in rows:
+        average = mean_from_sum(total, count)
+        found[student_id] = (None if average is None else round_average(average), count)
+    return found
+
+
+def fee_totals_by_student(
+    db: Session, student_ids: list[int], term_id: int | None = None
+) -> dict[int, FeeAmounts]:
+    """`fee_totals` for several students at once, in one query. Students with no bills
+    are absent from the result."""
+    paid_per_fee, paid = paid_per_fee_subquery()
+    conditions = [FeeRecord.student_id.in_(student_ids)]
+    if term_id is not None:
+        conditions.append(FeeRecord.term_id == term_id)
+    rows = db.execute(
+        select(
+            FeeRecord.student_id,
+            func.sum(FeeRecord.amount_billed),
+            func.coalesce(func.sum(paid), 0),
+        )
+        .outerjoin(paid_per_fee, paid_per_fee.c.fee_id == FeeRecord.id)
+        .where(*conditions)
+        .group_by(FeeRecord.student_id)
+    ).all()
+    return {
+        student_id: FeeAmounts(
+            billed=money.quantize(billed),
+            collected=money.quantize(collected),
+            outstanding=money.quantize(billed - collected),
+        )
+        for student_id, billed, collected in rows
+    }
+
+
+_NO_FEES = FeeAmounts(
+    billed=money.quantize(Decimal(0)),
+    collected=money.quantize(Decimal(0)),
+    outstanding=money.quantize(Decimal(0)),
+)
+
+
+def parent_overview(db: Session, user: User, term_id: int | None) -> ParentOverview:
+    """The parent dashboard (SRS FR-DASH-003): each linked active child with their
+    average, class average, recorded subjects and fee balance, in a fixed number of
+    queries however many children there are."""
+    term = resolve_term(db, term_id)
+    rows = db.execute(
+        select(
+            Student.id,
+            Student.student_number,
+            Student.full_name,
+            SchoolClass.id,
+            SchoolClass.name,
+            SchoolClass.is_active,
+        )
+        .join(SchoolClass, SchoolClass.id == Student.class_id)
+        .where(Student.is_active.is_(True), access.student_scope(user))
+        .order_by(Student.full_name, Student.id)
+    ).all()
+    if not rows:
+        return ParentOverview(term=term, children=[])
+
+    student_ids = [row[0] for row in rows]
+    own = {}
+    class_averages = {}
+    term_fees = {}
+    if term is not None:
+        own = _student_averages(db, student_ids, term.id)
+        class_averages = _overall_averages(
+            db, term.id, {row[3] for row in rows if row[5]}
+        )
+        term_fees = fee_totals_by_student(db, student_ids, term.id)
+    all_fees = fee_totals_by_student(db, student_ids)
+
+    def links(student_id: int) -> ChildLinks:
+        query = "" if term is None else f"?term_id={term.id}"
+        return ChildLinks(
+            results=f"/api/v1/students/{student_id}/results{query}",
+            fees=f"/api/v1/fees?student_id={student_id}",
+        )
+
+    children = []
+    for student_id, number, name, class_id, class_name, class_active in rows:
+        average, recorded = own.get(student_id, (None, 0))
+        children.append(
+            ParentChild(
+                student=ChildRef(id=student_id, student_number=number, full_name=name),
+                school_class=ClassRef(id=class_id, name=class_name),
+                student_average=average,
+                class_average=class_averages.get(class_id) if class_active else None,
+                subjects_recorded=recorded,
+                fees=FeesByPeriod(
+                    term=None if term is None else term_fees.get(student_id, _NO_FEES),
+                    all_time=all_fees.get(student_id, _NO_FEES),
+                ),
+                links=links(student_id),
+            )
+        )
+    return ParentOverview(term=term, children=children)

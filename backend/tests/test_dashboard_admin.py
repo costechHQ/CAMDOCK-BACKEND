@@ -16,7 +16,6 @@ from app.models.fees import FEE_TYPES
 from tests.test_access_scope import add, make_class, make_student
 from tests.test_averages import admin, admin_login, averages_url, school  # noqa: F401
 from tests.test_fee_receipts import bill
-from tests.test_teachers_api import login_headers
 from tests.test_terms_api import make_year
 
 URL = "/api/v1/dashboard/overview"
@@ -207,10 +206,8 @@ def test_bills_of_a_deactivated_student_still_count(db, api_client, admin, schoo
 # --- access -------------------------------------------------------------------------
 
 
-def test_parents_and_anonymous_users_are_refused(db, api_client, admin_login):
-    parent = login_headers(db, api_client, "parent")[1]
+def test_anonymous_users_are_refused(db, api_client, admin_login):
 
-    assert overview(api_client, parent).status_code == 403
     assert api_client.get(URL).status_code == 401
 
 
