@@ -1,0 +1,3713 @@
+{
+  "components": {
+    "schemas": {
+      "AdminOverview": {
+        "properties": {
+          "active_classes": {
+            "title": "Active Classes",
+            "type": "integer"
+          },
+          "class_averages": {
+            "items": {
+              "$ref": "#/components/schemas/ClassAverageEntry"
+            },
+            "title": "Class Averages",
+            "type": "array"
+          },
+          "fees": {
+            "$ref": "#/components/schemas/FeesByPeriod"
+          },
+          "role": {
+            "const": "admin",
+            "default": "admin",
+            "title": "Role",
+            "type": "string"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          },
+          "teachers": {
+            "title": "Teachers",
+            "type": "integer"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TermRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "term",
+          "students",
+          "teachers",
+          "active_classes",
+          "fees",
+          "class_averages"
+        ],
+        "title": "AdminOverview",
+        "type": "object"
+      },
+      "ChildLinks": {
+        "description": "API paths for the frontend to follow (SRS FR-DASH-003).",
+        "properties": {
+          "fees": {
+            "title": "Fees",
+            "type": "string"
+          },
+          "results": {
+            "title": "Results",
+            "type": "string"
+          }
+        },
+        "required": [
+          "results",
+          "fees"
+        ],
+        "title": "ChildLinks",
+        "type": "object"
+      },
+      "ChildRef": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "student_number": {
+            "title": "Student Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_number",
+          "full_name"
+        ],
+        "title": "ChildRef",
+        "type": "object"
+      },
+      "ClassAverageEntry": {
+        "properties": {
+          "overall_average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Average"
+          },
+          "school_class": {
+            "$ref": "#/components/schemas/ClassRef"
+          }
+        },
+        "required": [
+          "school_class",
+          "overall_average"
+        ],
+        "title": "ClassAverageEntry",
+        "type": "object"
+      },
+      "ClassAverages": {
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/ClassRef"
+          },
+          "overall_average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Average"
+          },
+          "students_with_results": {
+            "title": "Students With Results",
+            "type": "integer"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectAverage"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "term": {
+            "$ref": "#/components/schemas/TermRef"
+          }
+        },
+        "required": [
+          "class",
+          "term",
+          "students_with_results",
+          "subjects",
+          "overall_average"
+        ],
+        "title": "ClassAverages",
+        "type": "object"
+      },
+      "ClassOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "level"
+        ],
+        "title": "ClassOut",
+        "type": "object"
+      },
+      "ClassRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ClassRef",
+        "type": "object"
+      },
+      "FeeAmounts": {
+        "description": "Money over a set of bills, two decimal places. `collected` is the sum of the\npayments against those bills, whenever they were made.",
+        "properties": {
+          "billed": {
+            "title": "Billed",
+            "type": "string"
+          },
+          "collected": {
+            "title": "Collected",
+            "type": "string"
+          },
+          "outstanding": {
+            "title": "Outstanding",
+            "type": "string"
+          }
+        },
+        "required": [
+          "billed",
+          "collected",
+          "outstanding"
+        ],
+        "title": "FeeAmounts",
+        "type": "object"
+      },
+      "FeeCreate": {
+        "additionalProperties": false,
+        "description": "Only these fields are accepted: the receipt number, dates and status are\nserver-owned.",
+        "properties": {
+          "amount_billed": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "decimal_places": 2,
+            "gt": 0,
+            "le": "9999999999.99",
+            "max_digits": 12,
+            "title": "Amount Billed"
+          },
+          "amount_paid": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "decimal_places": 2,
+                "ge": 0,
+                "le": "9999999999.99",
+                "max_digits": 12
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Paid"
+          },
+          "fee_type": {
+            "enum": [
+              "Tuition Fee",
+              "Development Levy",
+              "Examination Fee",
+              "PTA Levy",
+              "Uniform & Materials"
+            ],
+            "title": "Fee Type",
+            "type": "string"
+          },
+          "student_id": {
+            "minimum": 1.0,
+            "title": "Student Id",
+            "type": "integer"
+          },
+          "term_id": {
+            "minimum": 1.0,
+            "title": "Term Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "student_id",
+          "term_id",
+          "fee_type",
+          "amount_billed"
+        ],
+        "title": "FeeCreate",
+        "type": "object"
+      },
+      "FeeOut": {
+        "description": "A bill with its instalments, oldest first.",
+        "properties": {
+          "amount_billed": {
+            "title": "Amount Billed",
+            "type": "string"
+          },
+          "amount_paid": {
+            "title": "Amount Paid",
+            "type": "string"
+          },
+          "balance": {
+            "title": "Balance",
+            "type": "string"
+          },
+          "fee_type": {
+            "title": "Fee Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentOut"
+            },
+            "title": "Payments",
+            "type": "array"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "partial",
+              "due"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/FeeStudent"
+          },
+          "term": {
+            "$ref": "#/components/schemas/TermRef"
+          }
+        },
+        "required": [
+          "id",
+          "receipt_number",
+          "student",
+          "term",
+          "fee_type",
+          "amount_billed",
+          "amount_paid",
+          "balance",
+          "status",
+          "recorded_at",
+          "payments"
+        ],
+        "title": "FeeOut",
+        "type": "object"
+      },
+      "FeePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FeeSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/FeeTotals"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "totals"
+        ],
+        "title": "FeePage",
+        "type": "object"
+      },
+      "FeeStudent": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "student_number": {
+            "title": "Student Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_number",
+          "full_name"
+        ],
+        "title": "FeeStudent",
+        "type": "object"
+      },
+      "FeeSummary": {
+        "description": "A bill and what has been paid against it. `amount_paid` is the sum of the\npayments, never stored; `balance` and `status` come from `services.money`.",
+        "properties": {
+          "amount_billed": {
+            "title": "Amount Billed",
+            "type": "string"
+          },
+          "amount_paid": {
+            "title": "Amount Paid",
+            "type": "string"
+          },
+          "balance": {
+            "title": "Balance",
+            "type": "string"
+          },
+          "fee_type": {
+            "title": "Fee Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "partial",
+              "due"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/FeeStudent"
+          },
+          "term": {
+            "$ref": "#/components/schemas/TermRef"
+          }
+        },
+        "required": [
+          "id",
+          "receipt_number",
+          "student",
+          "term",
+          "fee_type",
+          "amount_billed",
+          "amount_paid",
+          "balance",
+          "status",
+          "recorded_at"
+        ],
+        "title": "FeeSummary",
+        "type": "object"
+      },
+      "FeeTotals": {
+        "description": "Sums over every bill matching the filters, not just the current page.",
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "string"
+          },
+          "billed": {
+            "title": "Billed",
+            "type": "string"
+          },
+          "paid": {
+            "title": "Paid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "billed",
+          "paid",
+          "balance"
+        ],
+        "title": "FeeTotals",
+        "type": "object"
+      },
+      "FeeTypes": {
+        "properties": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "FeeTypes",
+        "type": "object"
+      },
+      "FeesByPeriod": {
+        "description": "`term` is for the selected term (None when there is no term); `all_time` spans\nevery term. They are never mixed.",
+        "properties": {
+          "all_time": {
+            "$ref": "#/components/schemas/FeeAmounts"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeeAmounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "term",
+          "all_time"
+        ],
+        "title": "FeesByPeriod",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "description": "Only credentials are accepted: the role always comes from the database.",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 1,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "LoginResponse": {
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "token_type": {
+            "const": "bearer",
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/app__schemas__auth__UserOut"
+          }
+        },
+        "required": [
+          "access_token",
+          "expires_at",
+          "user"
+        ],
+        "title": "LoginResponse",
+        "type": "object"
+      },
+      "NamedRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "NamedRef",
+        "type": "object"
+      },
+      "ParentChild": {
+        "properties": {
+          "class_average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Average"
+          },
+          "fees": {
+            "$ref": "#/components/schemas/FeesByPeriod"
+          },
+          "links": {
+            "$ref": "#/components/schemas/ChildLinks"
+          },
+          "school_class": {
+            "$ref": "#/components/schemas/ClassRef"
+          },
+          "student": {
+            "$ref": "#/components/schemas/ChildRef"
+          },
+          "student_average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Average"
+          },
+          "subjects_recorded": {
+            "title": "Subjects Recorded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "student",
+          "school_class",
+          "student_average",
+          "class_average",
+          "subjects_recorded",
+          "fees",
+          "links"
+        ],
+        "title": "ParentChild",
+        "type": "object"
+      },
+      "ParentLinkCreate": {
+        "additionalProperties": false,
+        "description": "Links an existing parent-role account to a student. The relationship is free\ntext because the SRS defines no list of values.",
+        "properties": {
+          "parent_user_id": {
+            "minimum": 1.0,
+            "title": "Parent User Id",
+            "type": "integer"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          }
+        },
+        "required": [
+          "parent_user_id"
+        ],
+        "title": "ParentLinkCreate",
+        "type": "object"
+      },
+      "ParentLinkOut": {
+        "properties": {
+          "parent_email": {
+            "title": "Parent Email",
+            "type": "string"
+          },
+          "parent_user_id": {
+            "title": "Parent User Id",
+            "type": "integer"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "student_id": {
+            "title": "Student Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "student_id",
+          "parent_user_id",
+          "parent_email",
+          "relationship"
+        ],
+        "title": "ParentLinkOut",
+        "type": "object"
+      },
+      "ParentOverview": {
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/ParentChild"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "role": {
+            "const": "parent",
+            "default": "parent",
+            "title": "Role",
+            "type": "string"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TermRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "term",
+          "children"
+        ],
+        "title": "ParentOverview",
+        "type": "object"
+      },
+      "PaymentCreate": {
+        "additionalProperties": false,
+        "description": "An instalment on an existing bill. The receipt number and date are server-owned.",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "decimal_places": 2,
+            "gt": 0,
+            "le": "9999999999.99",
+            "max_digits": 12,
+            "title": "Amount"
+          }
+        },
+        "required": [
+          "amount"
+        ],
+        "title": "PaymentCreate",
+        "type": "object"
+      },
+      "PaymentOut": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "paid_at": {
+            "format": "date-time",
+            "title": "Paid At",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "receipt_number",
+          "amount",
+          "paid_at"
+        ],
+        "title": "PaymentOut",
+        "type": "object"
+      },
+      "PaymentResult": {
+        "properties": {
+          "fee": {
+            "$ref": "#/components/schemas/FeeOut"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentOut"
+          }
+        },
+        "required": [
+          "payment",
+          "fee"
+        ],
+        "title": "PaymentResult",
+        "type": "object"
+      },
+      "PublicStats": {
+        "description": "Headline counts of active records for the public page. Counts only: no names,\nids or other personal data.",
+        "properties": {
+          "classes": {
+            "title": "Classes",
+            "type": "integer"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          },
+          "teachers": {
+            "title": "Teachers",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "students",
+          "teachers",
+          "classes"
+        ],
+        "title": "PublicStats",
+        "type": "object"
+      },
+      "Receipt": {
+        "description": "Printable receipt data (SRS FR-FEE-008). A bill receipt is numbered and dated\nlike the bill; an instalment receipt (`payment` set) like that payment, with the\nfigures as they stood once it was recorded.",
+        "properties": {
+          "amount_billed": {
+            "title": "Amount Billed",
+            "type": "string"
+          },
+          "amount_paid": {
+            "title": "Amount Paid",
+            "type": "string"
+          },
+          "balance": {
+            "title": "Balance",
+            "type": "string"
+          },
+          "date": {
+            "format": "date-time",
+            "title": "Date",
+            "type": "string"
+          },
+          "fee_type": {
+            "title": "Fee Type",
+            "type": "string"
+          },
+          "payment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentOut"
+            },
+            "title": "Payments",
+            "type": "array"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "school": {
+            "$ref": "#/components/schemas/SchoolInfo"
+          },
+          "signatures": {
+            "$ref": "#/components/schemas/ReceiptSignatures"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "partial",
+              "due"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/ReceiptStudent"
+          },
+          "term": {
+            "$ref": "#/components/schemas/TermRef"
+          }
+        },
+        "required": [
+          "school",
+          "receipt_number",
+          "date",
+          "student",
+          "term",
+          "fee_type",
+          "amount_billed",
+          "amount_paid",
+          "balance",
+          "status",
+          "payments",
+          "signatures"
+        ],
+        "title": "Receipt",
+        "type": "object"
+      },
+      "ReceiptSignatures": {
+        "description": "Labels only: the frontend draws blank signature and stamp boxes to print.",
+        "properties": {
+          "bursar_label": {
+            "default": "Bursar",
+            "title": "Bursar Label",
+            "type": "string"
+          },
+          "stamp_label": {
+            "default": "School stamp",
+            "title": "Stamp Label",
+            "type": "string"
+          }
+        },
+        "title": "ReceiptSignatures",
+        "type": "object"
+      },
+      "ReceiptStudent": {
+        "properties": {
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "student_number": {
+            "title": "Student Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_number",
+          "full_name",
+          "class_name"
+        ],
+        "title": "ReceiptStudent",
+        "type": "object"
+      },
+      "ResultOut": {
+        "properties": {
+          "class_id": {
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "grade": {
+            "title": "Grade",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "string"
+          },
+          "student_id": {
+            "title": "Student Id",
+            "type": "integer"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "integer"
+          },
+          "term_id": {
+            "title": "Term Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "subject_id",
+          "term_id",
+          "class_id",
+          "score",
+          "grade"
+        ],
+        "title": "ResultOut",
+        "type": "object"
+      },
+      "ResultPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResultRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "ResultPage",
+        "type": "object"
+      },
+      "ResultRow": {
+        "description": "One score in a class sheet listing.",
+        "properties": {
+          "class_id": {
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "grade": {
+            "title": "Grade",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "string"
+          },
+          "student_id": {
+            "title": "Student Id",
+            "type": "integer"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "student_number": {
+            "title": "Student Number",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "integer"
+          },
+          "subject_name": {
+            "title": "Subject Name",
+            "type": "string"
+          },
+          "term_id": {
+            "title": "Term Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "student_number",
+          "student_name",
+          "subject_id",
+          "subject_name",
+          "term_id",
+          "class_id",
+          "score",
+          "grade"
+        ],
+        "title": "ResultRow",
+        "type": "object"
+      },
+      "ResultSheet": {
+        "description": "Everything FR-RES-009 lists, for the frontend to render and print.",
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/ClassRef"
+          },
+          "overall_average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Average"
+          },
+          "school": {
+            "$ref": "#/components/schemas/SchoolInfo"
+          },
+          "student": {
+            "$ref": "#/components/schemas/SheetStudent"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SheetSubject"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "subjects_recorded": {
+            "title": "Subjects Recorded",
+            "type": "integer"
+          },
+          "term": {
+            "$ref": "#/components/schemas/TermRef"
+          }
+        },
+        "required": [
+          "school",
+          "student",
+          "class",
+          "term",
+          "subjects",
+          "subjects_recorded",
+          "overall_average"
+        ],
+        "title": "ResultSheet",
+        "type": "object"
+      },
+      "ResultWrite": {
+        "additionalProperties": false,
+        "description": "One score for a student, subject and term. Out-of-range or over-precise scores\nare rejected, never clamped or rounded.",
+        "properties": {
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Score"
+          },
+          "student_id": {
+            "minimum": 1.0,
+            "title": "Student Id",
+            "type": "integer"
+          },
+          "subject_id": {
+            "minimum": 1.0,
+            "title": "Subject Id",
+            "type": "integer"
+          },
+          "term_id": {
+            "minimum": 1.0,
+            "title": "Term Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "student_id",
+          "subject_id",
+          "term_id",
+          "score"
+        ],
+        "title": "ResultWrite",
+        "type": "object"
+      },
+      "SchoolInfo": {
+        "properties": {
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "location"
+        ],
+        "title": "SchoolInfo",
+        "type": "object"
+      },
+      "SheetStudent": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "student_number": {
+            "title": "Student Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_number",
+          "full_name"
+        ],
+        "title": "SheetStudent",
+        "type": "object"
+      },
+      "SheetSubject": {
+        "properties": {
+          "class_average": {
+            "title": "Class Average",
+            "type": "string"
+          },
+          "grade": {
+            "title": "Grade",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "integer"
+          },
+          "subject_name": {
+            "title": "Subject Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_id",
+          "subject_name",
+          "score",
+          "grade",
+          "class_average"
+        ],
+        "title": "SheetSubject",
+        "type": "object"
+      },
+      "StudentCreate": {
+        "additionalProperties": false,
+        "description": "Only these fields are accepted: the number, status and flags are server-owned.",
+        "properties": {
+          "class_id": {
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "full_name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "enum": [
+                  "male",
+                  "female"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
+          "guardian_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Display Name"
+          }
+        },
+        "required": [
+          "full_name",
+          "class_id"
+        ],
+        "title": "StudentCreate",
+        "type": "object"
+      },
+      "StudentOut": {
+        "properties": {
+          "class_id": {
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gender"
+          },
+          "guardian_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Display Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "student_number": {
+            "title": "Student Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_number",
+          "full_name",
+          "class_id",
+          "class_name",
+          "gender",
+          "date_of_birth",
+          "guardian_display_name",
+          "status"
+        ],
+        "title": "StudentOut",
+        "type": "object"
+      },
+      "StudentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "StudentPage",
+        "type": "object"
+      },
+      "StudentRef": {
+        "properties": {
+          "class_id": {
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "student_number": {
+            "title": "Student Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_number",
+          "full_name",
+          "class_id",
+          "class_name"
+        ],
+        "title": "StudentRef",
+        "type": "object"
+      },
+      "StudentResults": {
+        "properties": {
+          "average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectScore"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "student": {
+            "$ref": "#/components/schemas/StudentRef"
+          },
+          "subjects_recorded": {
+            "title": "Subjects Recorded",
+            "type": "integer"
+          },
+          "term": {
+            "$ref": "#/components/schemas/TermRef"
+          }
+        },
+        "required": [
+          "student",
+          "term",
+          "average",
+          "subjects_recorded",
+          "items"
+        ],
+        "title": "StudentResults",
+        "type": "object"
+      },
+      "SubjectAverage": {
+        "properties": {
+          "average": {
+            "title": "Average",
+            "type": "string"
+          },
+          "students_scored": {
+            "title": "Students Scored",
+            "type": "integer"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "integer"
+          },
+          "subject_name": {
+            "title": "Subject Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_id",
+          "subject_name",
+          "average",
+          "students_scored"
+        ],
+        "title": "SubjectAverage",
+        "type": "object"
+      },
+      "SubjectOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SubjectOut",
+        "type": "object"
+      },
+      "SubjectScore": {
+        "properties": {
+          "grade": {
+            "title": "Grade",
+            "type": "string"
+          },
+          "result_id": {
+            "title": "Result Id",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "integer"
+          },
+          "subject_name": {
+            "title": "Subject Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result_id",
+          "subject_id",
+          "subject_name",
+          "score",
+          "grade"
+        ],
+        "title": "SubjectScore",
+        "type": "object"
+      },
+      "TeacherClassEntry": {
+        "properties": {
+          "overall_average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Average"
+          },
+          "school_class": {
+            "$ref": "#/components/schemas/ClassRef"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "school_class",
+          "students",
+          "overall_average"
+        ],
+        "title": "TeacherClassEntry",
+        "type": "object"
+      },
+      "TeacherCreate": {
+        "additionalProperties": false,
+        "description": "The teacher record is always linked to an existing teacher-role account.",
+        "properties": {
+          "class_ids": {
+            "default": [],
+            "items": {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Class Ids",
+            "type": "array"
+          },
+          "full_name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "subject_ids": {
+            "default": [],
+            "items": {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Subject Ids",
+            "type": "array"
+          },
+          "user_id": {
+            "minimum": 1.0,
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "full_name"
+        ],
+        "title": "TeacherCreate",
+        "type": "object"
+      },
+      "TeacherOut": {
+        "properties": {
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/NamedRef"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/NamedRef"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "full_name",
+          "phone",
+          "is_active",
+          "classes",
+          "subjects"
+        ],
+        "title": "TeacherOut",
+        "type": "object"
+      },
+      "TeacherOverview": {
+        "description": "\"My overview\": the teacher's own classes only. No fee or school-wide figures.",
+        "properties": {
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/TeacherClassEntry"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "role": {
+            "const": "teacher",
+            "default": "teacher",
+            "title": "Role",
+            "type": "string"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TermRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "default": "My overview",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "students",
+          "classes"
+        ],
+        "title": "TeacherOverview",
+        "type": "object"
+      },
+      "TeacherPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TeacherOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "TeacherPage",
+        "type": "object"
+      },
+      "TermList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TermOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "TermList",
+        "type": "object"
+      },
+      "TermOut": {
+        "properties": {
+          "academic_year": {
+            "title": "Academic Year",
+            "type": "string"
+          },
+          "academic_year_id": {
+            "title": "Academic Year Id",
+            "type": "integer"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_current_year": {
+            "title": "Is Current Year",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "academic_year_id",
+          "academic_year",
+          "is_current_year",
+          "start_date",
+          "end_date"
+        ],
+        "title": "TermOut",
+        "type": "object"
+      },
+      "TermRef": {
+        "properties": {
+          "academic_year": {
+            "title": "Academic Year",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "academic_year"
+        ],
+        "title": "TermRef",
+        "type": "object"
+      },
+      "UserCreate": {
+        "additionalProperties": false,
+        "description": "Administrators are created only through the CLI, never over HTTP.",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 1024,
+            "title": "Password",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "teacher",
+              "parent"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "role",
+          "password"
+        ],
+        "title": "UserCreate",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "app__schemas__auth__UserOut": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role"
+        ],
+        "title": "UserOut",
+        "type": "object"
+      },
+      "app__schemas__users__UserOut": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "is_active"
+        ],
+        "title": "UserOut",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "Camdock International School Portal API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__schemas__auth__UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/classes": {
+      "get": {
+        "description": "Active classes the caller may reach: all for admins, assigned ones for teachers.",
+        "operationId": "list_classes_api_v1_classes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClassOut"
+                  },
+                  "title": "Response List Classes Api V1 Classes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Classes",
+        "tags": [
+          "classes"
+        ]
+      }
+    },
+    "/api/v1/classes/{class_id}/averages": {
+      "get": {
+        "description": "Per-subject and overall averages. Teachers reach only their assigned classes and\nsee every subject there; parents get their child's figures via student results.",
+        "operationId": "get_class_averages_api_v1_classes__class_id__averages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "title": "Class Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "term_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Term Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAverages"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Class Averages",
+        "tags": [
+          "classes"
+        ]
+      }
+    },
+    "/api/v1/dashboard/overview": {
+      "get": {
+        "description": "Role-specific overview for the selected term (default: the current term).\nAdmins get school-wide figures with fees for the term and for all time, kept\nseparate. Teachers get \"My overview\": their own classes only, no fees. Parents get their\nlinked children.",
+        "operationId": "overview_api_v1_dashboard_overview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "term_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Term Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "admin": "#/components/schemas/AdminOverview",
+                      "parent": "#/components/schemas/ParentOverview",
+                      "teacher": "#/components/schemas/TeacherOverview"
+                    },
+                    "propertyName": "role"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AdminOverview"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TeacherOverview"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ParentOverview"
+                    }
+                  ],
+                  "title": "Response Overview Api V1 Dashboard Overview Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Overview",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/fee-types": {
+      "get": {
+        "description": "The fixed list of fee categories.",
+        "operationId": "list_fee_types_api_v1_fee_types_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeTypes"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Fee Types",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees": {
+      "get": {
+        "description": "Admins see every bill; parents only their linked children's. `totals` cover all\nbills matching the filters, not just this page.",
+        "operationId": "list_fees_api_v1_fees_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "term_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Term Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fee_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "Tuition Fee",
+                    "Development Levy",
+                    "Examination Fee",
+                    "PTA Levy",
+                    "Uniform & Materials"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fee Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "paid",
+                    "partial",
+                    "due"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Fees",
+        "tags": [
+          "fees"
+        ]
+      },
+      "post": {
+        "description": "Bill a student, optionally recording a first payment. Amounts are naira with at\nmost two decimals; the receipt number and dates are assigned by the server.",
+        "operationId": "create_fee_api_v1_fees_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Fee",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/{fee_id}": {
+      "get": {
+        "description": "One bill with its payments; a parent only gets their own child's.",
+        "operationId": "get_fee_api_v1_fees__fee_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fee_id",
+            "required": true,
+            "schema": {
+              "title": "Fee Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Fee",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/{fee_id}/payments": {
+      "post": {
+        "description": "Record an instalment. A payment that would exceed the amount billed is refused.",
+        "operationId": "add_payment_api_v1_fees__fee_id__payments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fee_id",
+            "required": true,
+            "schema": {
+              "title": "Fee Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Payment",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/{fee_id}/payments/{payment_id}/receipt": {
+      "get": {
+        "description": "Receipt for one instalment, with the figures as they stood once it was paid.",
+        "operationId": "get_payment_receipt_api_v1_fees__fee_id__payments__payment_id__receipt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fee_id",
+            "required": true,
+            "schema": {
+              "title": "Fee Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "payment_id",
+            "required": true,
+            "schema": {
+              "title": "Payment Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Payment Receipt",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/{fee_id}/receipt": {
+      "get": {
+        "description": "Printable receipt data for a bill; a parent only gets their own child's.",
+        "operationId": "get_receipt_api_v1_fees__fee_id__receipt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fee_id",
+            "required": true,
+            "schema": {
+              "title": "Fee Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Receipt",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Api V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/public/stats": {
+      "get": {
+        "description": "No login needed. Counts of active students, teachers and classes only.",
+        "operationId": "public_stats_api_v1_public_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Public Stats",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/results": {
+      "get": {
+        "description": "Admins see every score; teachers only scores for classes and subjects they teach.",
+        "operationId": "list_results_api_v1_results_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "term_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Term Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Results",
+        "tags": [
+          "results"
+        ]
+      },
+      "put": {
+        "description": "Create (201) or change (200) one score; repeating the same score is a no-op.",
+        "operationId": "put_result_api_v1_results_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Put Result",
+        "tags": [
+          "results"
+        ]
+      }
+    },
+    "/api/v1/students": {
+      "get": {
+        "description": "Admins see every student; teachers only those in their assigned classes.",
+        "operationId": "list_students_api_v1_students_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Students",
+        "tags": [
+          "students"
+        ]
+      },
+      "post": {
+        "operationId": "create_student_api_v1_students_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Student",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}": {
+      "get": {
+        "operationId": "get_student_api_v1_students__student_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "title": "Student Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Student",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/parents": {
+      "get": {
+        "operationId": "list_parents_api_v1_students__student_id__parents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "title": "Student Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ParentLinkOut"
+                  },
+                  "title": "Response List Parents Api V1 Students  Student Id  Parents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Parents",
+        "tags": [
+          "students"
+        ]
+      },
+      "post": {
+        "operationId": "link_parent_api_v1_students__student_id__parents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "title": "Student Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParentLinkCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Link Parent",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/parents/{parent_user_id}": {
+      "delete": {
+        "operationId": "unlink_parent_api_v1_students__student_id__parents__parent_user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "title": "Student Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "parent_user_id",
+            "required": true,
+            "schema": {
+              "title": "Parent User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unlink Parent",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/result-sheet": {
+      "get": {
+        "description": "Printable term sheet with every subject. Admins and a student's linked parents\nonly: teachers see their own subjects through the student results endpoint.",
+        "operationId": "get_result_sheet_api_v1_students__student_id__result_sheet_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "title": "Student Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "term_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Term Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultSheet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Result Sheet",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/results": {
+      "get": {
+        "description": "A student's scores for a term: all subjects for admins and linked parents, only\nthe caller's own subjects for teachers.",
+        "operationId": "get_student_results_api_v1_students__student_id__results_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "title": "Student Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "term_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Term Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResults"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Student Results",
+        "tags": [
+          "students"
+        ]
+      }
+    },
+    "/api/v1/subjects": {
+      "get": {
+        "operationId": "list_subjects_api_v1_subjects_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubjectOut"
+                  },
+                  "title": "Response List Subjects Api V1 Subjects Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Subjects",
+        "tags": [
+          "subjects"
+        ]
+      }
+    },
+    "/api/v1/teachers": {
+      "get": {
+        "operationId": "list_teachers_api_v1_teachers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Teachers",
+        "tags": [
+          "teachers"
+        ]
+      },
+      "post": {
+        "operationId": "create_teacher_api_v1_teachers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeacherCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Teacher",
+        "tags": [
+          "teachers"
+        ]
+      }
+    },
+    "/api/v1/terms": {
+      "get": {
+        "description": "Terms, newest academic year first and First to Third Term within a year.",
+        "operationId": "list_terms_api_v1_terms_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "academic_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Academic Year Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Terms",
+        "tags": [
+          "terms"
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "post": {
+        "operationId": "create_user_api_v1_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__schemas__users__UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create User",
+        "tags": [
+          "users"
+        ]
+      }
+    }
+  }
+}
