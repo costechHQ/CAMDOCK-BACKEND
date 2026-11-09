@@ -68,6 +68,23 @@ def test_attempts_during_a_block_do_not_extend_it():
     assert throttle.retry_after("a") == 300
 
 
+def test_a_flood_during_a_block_neither_extends_it_nor_carries_over():
+    clock = Clock()
+    throttle = failure_throttle(clock)
+    for _ in range(5):
+        throttle.record_failure("a")
+    clock.advance(600)
+
+    for _ in range(12):
+        throttle.record_failure("a")
+
+    assert throttle.retry_after("a") == 300
+    clock.advance(300)
+    for _ in range(4):
+        assert throttle.record_failure("a") is False
+    assert throttle.retry_after("a") == 0
+
+
 def test_a_fresh_count_starts_after_a_block_ends():
     clock = Clock()
     throttle = failure_throttle(clock)

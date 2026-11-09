@@ -11,6 +11,11 @@ This note covers the rules that the schema alone does not say. All paths are und
   `POST /auth/logout` ends the session, and `GET /auth/me` returns the signed-in account.
 - Roles: `admin`, `teacher`, `parent`. Only `GET /health`, `POST /auth/login` and
   `GET /public/stats` need no token.
+- Failed sign-ins are throttled. After 5 failures for one email (or 20 from one
+  address) within 15 minutes, `POST /auth/login` returns **429** with code
+  `too_many_attempts` and a `Retry-After` header (seconds) for 15 minutes, even if the
+  password is then correct. Wrong password, unknown email and disabled account all count
+  the same. A successful login clears the email's count.
 - A missing or invalid token gives **401**. A valid token whose role may not use the
   endpoint gives **403**.
 - A record the caller may not reach gives **404**, identical to a record that does not
@@ -25,7 +30,7 @@ Every error has the same body. Validation errors (422) also carry a `details` li
 ```
 
 Status codes: 401, 403, 404, 409 (conflicts such as a duplicate bill), 422 (invalid
-input, including an unknown `term_id`).
+input, including an unknown `term_id`), 429 (too many failed sign-ins).
 
 ## Conventions
 

@@ -2114,6 +2114,9 @@
               }
             },
             "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many failed attempts; see the Retry-After header."
           }
         },
         "summary": "Login",
