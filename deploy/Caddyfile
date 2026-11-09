@@ -1,0 +1,5 @@
+# Reverse proxy for docker-compose.prod.yml. SITE_ADDRESS comes from .env:
+# a domain name (https is then automatic) or ":80" for a plain-HTTP test.
+{$SITE_ADDRESS} {
+	reverse_proxy api:8000
+}
