@@ -55,11 +55,17 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = ""
     # Largest accepted request body, from its declared Content-Length.
     max_request_body_kb: int = Field(default=1024, ge=1)
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # Comma-separated proxy addresses or CIDR ranges whose X-Forwarded-For is believed.
     trusted_proxies: str = ""
     # Printed on result sheets; the defaults are the values the SRS confirms.
     school_name: str = Field(default="Camdock International School", min_length=1)
     school_location: str = Field(default="Enugu State, Nigeria", min_length=1)
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def _upper_case_level(cls, value: object) -> object:
+        return value.upper() if isinstance(value, str) else value
 
     @field_validator("cors_allowed_origins")
     @classmethod

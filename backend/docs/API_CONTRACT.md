@@ -30,6 +30,10 @@ This note covers the rules that the schema alone does not say. All paths are und
   `Authorization` and `Content-Type`.
 - Responses are never cacheable (`Cache-Control: no-store`) and carry the standard
   security headers.
+- Every response carries an `X-Request-ID` header. Quote it when reporting a problem:
+  it ties the response to the server log. You may send your own `X-Request-ID` (8 to
+  64 letters, digits, `.`, `_` or `-`); anything else is replaced. Browsers can read
+  `X-Request-ID` and `Retry-After` from allowed origins.
 - A missing or invalid token gives **401**. A valid token whose role may not use the
   endpoint gives **403**.
 - A record the caller may not reach gives **404**, identical to a record that does not

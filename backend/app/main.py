@@ -1,10 +1,14 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import check_production_settings, get_settings
 from app.core.errors import register_error_handlers
 from app.core.http_hardening import BodySizeLimitMiddleware, SecurityHeadersMiddleware
+from app.core.logging import configure_logging
 from app.core.ratelimit import GlobalRateLimitMiddleware, RateLimiter
+from app.core.request_log import RequestLogMiddleware, UnexpectedErrorMiddleware
 from app.core.throttle import FailureThrottle, LoginThrottle
 from app.routers.router import api_router
 
@@ -27,9 +31,14 @@ def create_app() -> FastAPI:
     app.state.public_limiter = RateLimiter(settings.rate_limit_public_per_minute)
     app.state.global_limiter = RateLimiter(settings.rate_limit_global_per_minute)
     prefix = settings.api_v1_prefix
-    # The last middleware added is the outermost. From the outside in: security headers,
-    # CORS (so refusals below still carry CORS headers), the rate limit (every request
-    # counts), then the body-size check.
+    configure_logging(settings.environment, settings.log_level)
+    # Our access line replaces uvicorn's, which prints the full URL with its query string.
+    logging.getLogger("uvicorn.access").disabled = True
+    # The last middleware added is the outermost. From the outside in: request log (id
+    # and access line), security headers, CORS (so refusals below still carry CORS
+    # headers), the rate limit (every request counts), the body-size check, then the
+    # catch-all that turns unexpected errors into a 500.
+    app.add_middleware(UnexpectedErrorMiddleware)
     app.add_middleware(
         BodySizeLimitMiddleware, max_bytes=settings.max_request_body_kb * 1024
     )
@@ -46,12 +55,18 @@ def create_app() -> FastAPI:
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
             allow_headers=["Authorization", "Content-Type"],
             allow_credentials=False,
+            expose_headers=["X-Request-ID", "Retry-After"],
             max_age=600,
         )
     app.add_middleware(
         SecurityHeadersMiddleware,
         production=settings.environment == "production",
         csp_exempt_paths=frozenset({"/docs", "/redoc", "/openapi.json"}),
+    )
+    app.add_middleware(
+        RequestLogMiddleware,
+        quiet_paths=frozenset({f"{prefix}/health"}),
+        trusted_proxies=settings.trusted_proxy_networks,
     )
     register_error_handlers(app)
     app.include_router(api_router, prefix=settings.api_v1_prefix)

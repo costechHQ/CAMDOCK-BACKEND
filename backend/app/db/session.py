@@ -14,6 +14,8 @@ def get_engine() -> Engine:
     return create_engine(
         get_settings().database_url.get_secret_value(),
         pool_pre_ping=True,
+        # Bound values (emails, scores, amounts) must never appear in error messages.
+        hide_parameters=True,
         connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
     )
 
