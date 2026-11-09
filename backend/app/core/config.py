@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     login_ip_max_failures: int = Field(default=20, ge=1)
     login_window_minutes: int = Field(default=15, ge=1)
     login_block_minutes: int = Field(default=15, ge=1)
+    # Requests per minute per client address: the open /public/stats endpoint, and every
+    # endpoint together (/health is exempt).
+    rate_limit_public_per_minute: int = Field(default=30, ge=1)
+    rate_limit_global_per_minute: int = Field(default=300, ge=1)
     # Comma-separated proxy addresses or CIDR ranges whose X-Forwarded-For is believed.
     trusted_proxies: str = ""
     # Printed on result sheets; the defaults are the values the SRS confirms.

@@ -2813,6 +2813,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests; see the Retry-After header."
           }
         },
         "summary": "Public Stats",

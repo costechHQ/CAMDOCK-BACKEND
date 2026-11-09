@@ -16,6 +16,10 @@ This note covers the rules that the schema alone does not say. All paths are und
   `too_many_attempts` and a `Retry-After` header (seconds) for 15 minutes, even if the
   password is then correct. Wrong password, unknown email and disabled account all count
   the same. A successful login clears the email's count.
+- Request rates are limited per client address, per minute. `GET /public/stats` allows
+  30 and the whole API allows 300 (`GET /health` is exempt). Over the limit gives **429**
+  with code `rate_limited` and a `Retry-After` header (seconds until the window ends).
+  Login failures have their own 429 code, `too_many_attempts`.
 - A missing or invalid token gives **401**. A valid token whose role may not use the
   endpoint gives **403**.
 - A record the caller may not reach gives **404**, identical to a record that does not
@@ -30,7 +34,7 @@ Every error has the same body. Validation errors (422) also carry a `details` li
 ```
 
 Status codes: 401, 403, 404, 409 (conflicts such as a duplicate bill), 422 (invalid
-input, including an unknown `term_id`), 429 (too many failed sign-ins).
+input, including an unknown `term_id`), 429 (too many failed sign-ins, or too many requests).
 
 ## Conventions
 
