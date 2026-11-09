@@ -20,6 +20,16 @@ This note covers the rules that the schema alone does not say. All paths are und
   30 and the whole API allows 300 (`GET /health` is exempt). Over the limit gives **429**
   with code `rate_limited` and a `Retry-After` header (seconds until the window ends).
   Login failures have their own 429 code, `too_many_attempts`.
+- Request bodies are limited to 1 MiB (`MAX_REQUEST_BODY_KB`), judged from the
+  `Content-Length` header: larger gives **413** (`payload_too_large`), and a body sent
+  without `Content-Length` (chunked) gives **411** (`length_required`). Normal `fetch`
+  calls with a JSON string body send the header automatically.
+- Browsers may call the API only from the origins listed in `CORS_ALLOWED_ORIGINS`
+  (none by default). Credentials are not used: send the token in `Authorization`.
+  Allowed methods are GET, POST, PUT, PATCH and DELETE; allowed request headers are
+  `Authorization` and `Content-Type`.
+- Responses are never cacheable (`Cache-Control: no-store`) and carry the standard
+  security headers.
 - A missing or invalid token gives **401**. A valid token whose role may not use the
   endpoint gives **403**.
 - A record the caller may not reach gives **404**, identical to a record that does not
@@ -34,7 +44,7 @@ Every error has the same body. Validation errors (422) also carry a `details` li
 ```
 
 Status codes: 401, 403, 404, 409 (conflicts such as a duplicate bill), 422 (invalid
-input, including an unknown `term_id`), 429 (too many failed sign-ins, or too many requests).
+input, including an unknown `term_id`), 411 and 413 (request body without a length, or too large), 429 (too many failed sign-ins, or too many requests).
 
 ## Conventions
 
