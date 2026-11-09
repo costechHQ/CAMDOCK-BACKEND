@@ -45,7 +45,13 @@ def create_app() -> FastAPI:
     app.add_middleware(
         GlobalRateLimitMiddleware,
         exempt_paths=frozenset(
-            {f"{prefix}/health", "/docs", "/redoc", "/openapi.json"}
+            {
+                f"{prefix}/health",
+                f"{prefix}/health/ready",
+                "/docs",
+                "/redoc",
+                "/openapi.json",
+            }
         ),
     )
     if settings.cors_origins:
@@ -65,9 +71,27 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         RequestLogMiddleware,
-        quiet_paths=frozenset({f"{prefix}/health"}),
+        quiet_paths=frozenset({f"{prefix}/health", f"{prefix}/health/ready"}),
         trusted_proxies=settings.trusted_proxy_networks,
     )
     register_error_handlers(app)
     app.include_router(api_router, prefix=settings.api_v1_prefix)
     return app
+
+
+_app: FastAPI | None = None
+
+
+def __getattr__(name: str) -> FastAPI:
+    """Build `app` on first use so `fastapi dev` and `uvicorn app.main:app` can find it
+    without the app (and its settings) being created whenever this module is imported."""
+    global _app
+    if name != "app":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    if _app is None:
+        _app = create_app()
+    return _app
+
+
+def __dir__() -> list[str]:
+    return [*globals(), "app"]

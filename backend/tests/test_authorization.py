@@ -108,6 +108,7 @@ def test_require_roles_rejects_bad_arguments(roles):
 
 PUBLIC_ROUTES = {
     ("get", "/api/v1/health"),
+    ("get", "/api/v1/health/ready"),
     ("get", "/api/v1/public/stats"),
     ("post", "/api/v1/auth/login"),
 }

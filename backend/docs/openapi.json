@@ -2799,6 +2799,32 @@
         ]
       }
     },
+    "/api/v1/health/ready": {
+      "get": {
+        "description": "For deploy gates: the database answers and its schema is at the expected\nmigration. Failures are generic; the log says which check failed.",
+        "operationId": "ready_api_v1_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Ready Api V1 Health Ready Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/api/v1/public/stats": {
       "get": {
         "description": "No login needed. Counts of active students, teachers and classes only.",

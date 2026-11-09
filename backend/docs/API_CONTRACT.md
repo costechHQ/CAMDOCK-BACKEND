@@ -68,6 +68,15 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
   sum of payments against those bills, whenever they were paid; `outstanding` is
   `billed - collected`. Bills of deactivated students still count.
 
+## Health checks (no login, not rate limited)
+
+- `GET /health` answers `{"status": "ok", "database": "ok"}` when the API can reach its
+  database, otherwise 503.
+- `GET /health/ready` answers `{"status": "ok", "database": "ok", "migrations": "ok"}`
+  only when the database schema is at the migration this version of the API expects.
+  Otherwise it returns 503 with the standard error body and no detail. Use it as a
+  deploy gate after running migrations; use `/health` for liveness probes.
+
 ## `GET /public/stats` (no login)
 
 ```json
