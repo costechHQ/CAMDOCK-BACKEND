@@ -131,10 +131,12 @@ def test_only_the_expected_methods_and_headers_are_allowed(monkeypatch):
     client = TestClient(app_with(monkeypatch, cors_allowed_origins=ORIGIN))
 
     allowed = preflight(client, method="DELETE", headers="authorization, content-type")
+    keyed = preflight(client, headers="authorization, idempotency-key")
     bad_method = preflight(client, method="TRACE")
     bad_header = preflight(client, headers="x-custom")
 
     assert allowed.status_code == 200
+    assert keyed.status_code == 200
     assert bad_method.status_code == 400
     assert bad_header.status_code == 400
 

@@ -2624,6 +2624,25 @@
               "title": "Fee Id",
               "type": "integer"
             }
+          },
+          {
+            "description": "Optional. A unique value (8 to 64 letters, digits, `.`, `_` or `-`) per payment. Send the same value when retrying so a payment is never recorded twice.",
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9._-]{8,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. A unique value (8 to 64 letters, digits, `.`, `_` or `-`) per payment. Send the same value when retrying so a payment is never recorded twice.",
+              "title": "Idempotency-Key"
+            }
           }
         ],
         "requestBody": {
@@ -2637,6 +2656,16 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResult"
+                }
+              }
+            },
+            "description": "A retry with the same Idempotency-Key: the payment that was already recorded, unchanged. Nothing new was created."
+          },
           "201": {
             "content": {
               "application/json": {
@@ -2646,6 +2675,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "409": {
+            "description": "The Idempotency-Key was already used for a different bill or amount."
           },
           "422": {
             "content": {

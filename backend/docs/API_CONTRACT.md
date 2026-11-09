@@ -53,6 +53,15 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
 ## Conventions
 
 - **Money** is naira with exactly two decimals, as a string: `"25000.50"`.
+- **Retrying a payment safely.** `POST /fees/{id}/payments` accepts an optional
+  `Idempotency-Key` header (8 to 64 letters, digits, `.`, `_` or `-`; anything else is
+  a 422). Generate a new key for each payment the admin enters and send the same key
+  again if you have to retry. The first call returns **201**. A retry with the same
+  key, bill and amount returns **200** with the original payment and the bill, and
+  records nothing new, even if the bill has since been paid in full. The same key with
+  a different bill or amount returns **409** `idempotency_key_reused`. Keys belong to
+  the admin who sent them and never expire. Without the header every call records a
+  new payment.
 - **Averages** are strings with one decimal, rounded half up: `"60.9"`. `null` means
   nothing is recorded; it is never shown as zero.
 - **Lists** return `{items, total, limit, offset}`. `limit` defaults to 20, maximum 100.

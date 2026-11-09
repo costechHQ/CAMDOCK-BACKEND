@@ -37,6 +37,7 @@ REVISIONS = [
     "0008",
     "0009",
     "0010",
+    "0011",
 ]
 
 pytestmark = pytest.mark.skipif(
@@ -178,6 +179,30 @@ def test_fee_numbering_and_uniqueness_are_created_and_dropped(clean_engine):
         assert conn.execute(sequences).scalars().all() == []
         assert conn.execute(constraint).scalars().all() == []
         assert conn.execute(index).scalars().all() == []
+
+
+def test_payment_idempotency_key_is_created_and_dropped(clean_engine):
+    config = alembic_config()
+    column = text(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_name = 'fee_payments' AND column_name = 'idempotency_key'"
+    )
+    constraint = text(
+        "SELECT conname FROM pg_constraint "
+        "WHERE conname = 'uq_fee_payments_created_by_idempotency_key'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(column).scalars().all() == ["YES"]
+        assert conn.execute(constraint).scalars().all() == [
+            "uq_fee_payments_created_by_idempotency_key"
+        ]
+
+    command.downgrade(config, "0010")
+    with clean_engine.connect() as conn:
+        assert conn.execute(column).scalars().all() == []
+        assert conn.execute(constraint).scalars().all() == []
 
 
 def test_migrated_schema_matches_models(clean_engine):

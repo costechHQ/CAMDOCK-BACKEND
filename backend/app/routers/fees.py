@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -92,14 +92,42 @@ def create_fee(
     return fee
 
 
-@router.post("/{fee_id}/payments", status_code=201)
+@router.post(
+    "/{fee_id}/payments",
+    status_code=201,
+    responses={
+        200: {
+            "model": PaymentResult,
+            "description": "A retry with the same Idempotency-Key: the payment that was "
+            "already recorded, unchanged. Nothing new was created.",
+        },
+        409: {
+            "description": "The Idempotency-Key was already used for a different bill "
+            "or amount."
+        },
+    },
+)
 def add_payment(
     fee_id: int,
     body: PaymentCreate,
     admin: Annotated[User, Depends(require_roles("admin"))],
     db: Annotated[Session, Depends(get_db)],
+    response: Response,
+    idempotency_key: Annotated[
+        str | None,
+        Header(
+            pattern=r"^[A-Za-z0-9._-]{8,64}$",
+            description="Optional. A unique value (8 to 64 letters, digits, `.`, `_` "
+            "or `-`) per payment. Send the same value when retrying so a payment is "
+            "never recorded twice.",
+        ),
+    ] = None,
 ) -> PaymentResult:
     """Record an instalment. A payment that would exceed the amount billed is refused."""
-    result = fee_service.add_payment(db, admin, fee_id, body)
+    result, created = fee_service.record_payment(
+        db, admin, fee_id, body, idempotency_key
+    )
     db.commit()
+    if not created:
+        response.status_code = 200
     return result
