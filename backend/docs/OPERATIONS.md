@@ -92,15 +92,21 @@ visitor address in `client=`; if it shows `172.28.0.10` (the proxy), the setting
   It refuses an email that already has an account. Teachers and parents are created by an
   administrator inside the portal.
 
-- **Disable an account** (a leaver, or a lost password you do not want used). The change
-  takes effect immediately, including for people already signed in. Replace the email:
+- **Disable or re-enable an account** (a leaver, or an account you do not want used).
+  An administrator does this in the portal, which calls `PATCH /api/v1/users/{id}` with
+  `{"is_active": false}`; `GET /api/v1/users?q=...` finds the account. Disabling ends the
+  account's sessions at once, and re-enabling does not bring them back, so the person
+  signs in again. You cannot disable yourself or the last active administrator. Linked
+  teacher records are not changed. Every change is in the audit log.
+
+  If the portal itself is unreachable, the same can be done in the database (replace the
+  email; this does not end sessions, but a disabled account is refused on every request):
 
   ```bash
   dc exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "UPDATE users SET is_active = false WHERE email = '"'"'someone@school.example'"'"'"'
   ```
 
-  Set it back to `true` to re-enable. Never delete user rows: payments, results and the
-  audit log refer to them.
+  Never delete user rows: payments, results and the audit log refer to them.
 
 - **Reset a forgotten password:** *this version has no password-reset feature.* The
   workable route today is to disable the old account and create a new one with a new
@@ -153,7 +159,8 @@ names.
 
 These are not faults, but you should know them:
 
-1. No password reset and no admin screen to disable accounts (use the commands above).
+1. No password reset yet (the route today is to disable the old account and create a new
+   one with a new email).
 2. No payment void or refund.
 3. In-memory rate limiting and sign-in blocking (see above).
 4. Receipt numbers (`RCP-YYYY-NNNNNN`) are a proposal the school has not confirmed.

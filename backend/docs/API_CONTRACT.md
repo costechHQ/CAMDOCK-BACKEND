@@ -67,6 +67,19 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
 - **Lists** return `{items, total, limit, offset}`. `limit` defaults to 20, maximum 100.
 - Dates and times are ISO 8601.
 
+## Accounts (admin only)
+
+- `GET /users?q=&role=&is_active=&limit=&offset=` lists accounts by email, in the usual
+  `{items, total, limit, offset}` shape. `q` matches part of the email, ignoring case;
+  `role` is `admin`, `teacher` or `parent`. Each item has `id`, `email`, `role`,
+  `is_active`, `last_login_at` and `created_at`. No credential is ever returned.
+- `PATCH /users/{id}` with `{"is_active": true|false}` disables or re-enables an
+  account and returns it. Disabling ends all the account's sessions immediately;
+  re-enabling does not restore them. Setting the value the account already has changes
+  nothing. Only `is_active` is accepted (anything else is a 422).
+- **409** if an administrator tries to disable their own account, or an administrator
+  whose disabling would leave no active administrator. **404** for an unknown id.
+
 ## Terms and fee totals
 
 - `term_id` is optional on the dashboard. Omitted, the server uses the current academic

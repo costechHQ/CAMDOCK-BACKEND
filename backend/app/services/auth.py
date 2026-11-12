@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -69,6 +69,20 @@ def get_active_session(db: Session, token: str) -> tuple[AuthSession, User] | No
         )
     ).one_or_none()
     return None if row is None else (row[0], row[1])
+
+
+def revoke_user_sessions(
+    db: Session, user_id: int, *, except_session_id: int | None = None
+) -> int:
+    """End every usable session of a user (optionally sparing one); returns how many."""
+    conditions = [AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None)]
+    if except_session_id is not None:
+        conditions.append(AuthSession.id != except_session_id)
+    result = db.execute(
+        update(AuthSession).where(*conditions).values(revoked_at=datetime.now(UTC))
+    )
+    db.flush()
+    return result.rowcount
 
 
 def revoke_session(db: Session, session: AuthSession) -> None:
