@@ -31,6 +31,7 @@ errors, status codes, retries) are in [`docs/API_CONTRACT.md`](docs/API_CONTRACT
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Putting the system on a server. |
 | [`docs/BACKUP_RESTORE.md`](docs/BACKUP_RESTORE.md) | Saving and recovering the school's data. |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Running it day to day: logs, blocked users, troubleshooting. |
+| [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) | The SRS Section 8 criteria, where each is proved, and the recorded run. |
 
 ## Prerequisites
 

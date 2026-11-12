@@ -29,6 +29,6 @@ class UserOut(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: str
-    token_type: Literal["bearer"] = "bearer"
+    token_type: Literal["bearer"] = "bearer"  # noqa: S105  (the scheme name)
     expires_at: datetime
     user: UserOut

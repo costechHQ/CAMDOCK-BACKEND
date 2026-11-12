@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.session import get_session_factory
 from app.services.accounts import create_admin
 
-PASSWORD_ENV = "CAMDOCK_ADMIN_PASSWORD"
+PASSWORD_ENV = "CAMDOCK_ADMIN_PASSWORD"  # noqa: S105  (a variable name, not a password)
 
 
 class CliError(Exception):
