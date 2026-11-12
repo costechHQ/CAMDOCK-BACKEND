@@ -28,6 +28,11 @@ def create_app() -> FastAPI:
         FailureThrottle(settings.login_max_failures, window, block),
         FailureThrottle(settings.login_ip_max_failures, window, block),
     )
+    # Wrong reset codes are counted apart from wrong passwords, with the same limits.
+    app.state.reset_throttle = LoginThrottle(
+        FailureThrottle(settings.login_max_failures, window, block),
+        FailureThrottle(settings.login_ip_max_failures, window, block),
+    )
     app.state.public_limiter = RateLimiter(settings.rate_limit_public_per_minute)
     app.state.global_limiter = RateLimiter(settings.rate_limit_global_per_minute)
     prefix = settings.api_v1_prefix

@@ -41,3 +41,13 @@ class PasswordChange(BaseModel):
 
     current_password: str = Field(min_length=1, max_length=1024)
     new_password: str = Field(min_length=1, max_length=1024)
+
+
+class PasswordResetRequest(BaseModel):
+    """A reset code, the account's email, and the new password to set."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: Email
+    code: str = Field(min_length=1, max_length=64)
+    new_password: str = Field(min_length=1, max_length=1024)

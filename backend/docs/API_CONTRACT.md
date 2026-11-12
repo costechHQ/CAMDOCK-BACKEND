@@ -9,8 +9,9 @@ This note covers the rules that the schema alone does not say. All paths are und
 
 - `POST /auth/login` returns a bearer token; send it as `Authorization: Bearer <token>`.
   `POST /auth/logout` ends the session, and `GET /auth/me` returns the signed-in account.
-- Roles: `admin`, `teacher`, `parent`. Only `GET /health`, `POST /auth/login` and
-  `GET /public/stats` need no token.
+- Roles: `admin`, `teacher`, `parent`. Only `GET /health`, `GET /health/ready`,
+  `POST /auth/login`, `POST /auth/reset-password` and `GET /public/stats` need no
+  token.
 - Failed sign-ins are throttled. After 5 failures for one email (or 20 from one
   address) within 15 minutes, `POST /auth/login` returns **429** with code
   `too_many_attempts` and a `Retry-After` header (seconds) for 15 minutes, even if the
@@ -26,6 +27,18 @@ This note covers the rules that the schema alone does not say. All paths are und
   wrong attempts the endpoint, and sign-in for that email, answer **429**
   `too_many_attempts` with `Retry-After`. On success every *other* session of the
   account ends; the one that made the request stays signed in.
+- `POST /auth/reset-password` (no token) sets a new password with a one-time code
+  an administrator issued: send `{"email", "code", "new_password"}`; the answer is
+  **204** with no body, and the user is **not** signed in, so show the sign-in
+  screen next. Case, spaces and hyphens in the code do not matter. Every problem
+  with the code (wrong, expired, used, replaced, someone else's, unknown email,
+  disabled account) gives the same **422** with code `invalid_reset_code`; the
+  screen should say to ask the administrator for a new code. A new password that
+  breaks the rules is a different 422 (`validation_error`, with the reason) and
+  does not use up the code. Five wrong codes for an email (or 20 from one address)
+  in 15 minutes give **429** `too_many_attempts` with `Retry-After`, counted apart
+  from wrong passwords. On success every session of the account ends and any
+  sign-in block on that email is lifted.
 - Request rates are limited per client address, per minute. `GET /public/stats` allows
   30 and the whole API allows 300 (`GET /health` is exempt). Over the limit gives **429**
   with code `rate_limited` and a `Retry-After` header (seconds until the window ends).

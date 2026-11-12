@@ -111,6 +111,7 @@ PUBLIC_ROUTES = {
     ("get", "/api/v1/health/ready"),
     ("get", "/api/v1/public/stats"),
     ("post", "/api/v1/auth/login"),
+    ("post", "/api/v1/auth/reset-password"),
 }
 
 

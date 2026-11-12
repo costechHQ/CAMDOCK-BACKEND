@@ -14,6 +14,7 @@ from app.core.security import (
 from app.models import AuditLog, User
 from app.schemas.users import UserCreate, UserPage, UserSummary
 from app.services import auth as auth_service
+from app.services import password_resets
 from app.services.search import name_contains
 
 EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
@@ -182,6 +183,9 @@ def set_user_active(
     user.is_active = active
     if not active:
         auth_service.revoke_user_sessions(db, user.id)
+        # A code issued before the account was disabled must not come back to life
+        # when it is re-enabled.
+        password_resets.void_live_codes(db, user.id)
     db.add(
         AuditLog(
             actor_user_id=actor.id,
@@ -230,6 +234,8 @@ def change_own_password(
         )
 
     locked.password_hash = hash_password(new)
+    # A reset code issued earlier must not outlive the password just chosen.
+    password_resets.void_live_codes(db, locked.id)
     ended = auth_service.revoke_user_sessions(
         db, locked.id, except_session_id=keep_session_id
     )

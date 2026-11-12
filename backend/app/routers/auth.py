@@ -10,8 +10,14 @@ from app.core.errors import AppError
 from app.db.session import get_db
 from app.dependencies import AuthContext, get_auth_context, get_current_user
 from app.models import User
-from app.schemas.auth import LoginRequest, LoginResponse, PasswordChange, UserOut
-from app.services import accounts
+from app.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    PasswordChange,
+    PasswordResetRequest,
+    UserOut,
+)
+from app.services import accounts, password_resets
 from app.services import auth as auth_service
 
 logger = logging.getLogger(__name__)
@@ -121,4 +127,51 @@ def change_password(
         ) from None
     db.commit()
     throttle.record_success(email)
+    return Response(status_code=204)
+
+
+@router.post(
+    "/reset-password",
+    status_code=204,
+    responses={
+        422: {
+            "description": "The reset code is not valid (code `invalid_reset_code`, "
+            "whatever the reason) or the new password is not acceptable."
+        },
+        429: {"description": "Too many wrong codes; see the Retry-After header."},
+    },
+)
+def reset_password(
+    body: PasswordResetRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> Response:
+    """Set a new password with a one-time code from an administrator. All the account's
+    sessions end; the user then signs in normally. Every problem with the code looks
+    the same, and wrong codes are limited like wrong passwords."""
+    throttle = request.app.state.reset_throttle
+    ip = client_ip(request, get_settings().trusted_proxy_networks)
+    wait = throttle.retry_after(body.email, ip)
+    if wait:
+        raise AppError(
+            "Too many failed attempts. Try again later.",
+            status_code=429,
+            code="too_many_attempts",
+            headers={"Retry-After": str(wait)},
+        )
+    try:
+        password_resets.redeem_reset_code(db, body.email, body.code, body.new_password)
+    except password_resets.InvalidResetCode:
+        db.rollback()
+        if throttle.record_failure(body.email, ip):
+            logger.warning("Reset code attempts blocked for client %s", ip)
+        raise AppError(
+            "That reset code is not valid. Ask your administrator for a new one.",
+            status_code=422,
+            code="invalid_reset_code",
+        ) from None
+    db.commit()
+    # The user has proven they hold the code: lift any block left by failed attempts.
+    throttle.record_success(body.email)
+    request.app.state.login_throttle.record_success(body.email)
     return Response(status_code=204)
