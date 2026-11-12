@@ -83,6 +83,10 @@ visitor address in `client=`; if it shows `172.28.0.10` (the proxy), the setting
 
 ## Accounts
 
+- **A user wants a new password they know the old one of:** they do it themselves in
+  the portal (`POST /auth/change-password`). Their other sessions end. Five wrong
+  current passwords block them like five wrong sign-ins (15 minutes).
+
 - **Create an administrator** (also the way to get back in if no admin can sign in):
 
   ```bash

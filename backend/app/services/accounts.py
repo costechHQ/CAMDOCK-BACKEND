@@ -5,7 +5,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.core.security import PasswordPolicyError, hash_password, validate_new_password
+from app.core.security import (
+    PasswordPolicyError,
+    hash_password,
+    validate_new_password,
+    verify_password,
+)
 from app.models import AuditLog, User
 from app.schemas.users import UserCreate, UserPage, UserSummary
 from app.services import auth as auth_service
@@ -188,3 +193,54 @@ def set_user_active(
     )
     db.flush()
     return UserSummary.model_validate(user)
+
+
+class IncorrectPassword(Exception):
+    """The current password given does not match; nothing was changed."""
+
+
+def change_own_password(
+    db: Session, user: User, keep_session_id: int, current: str, new: str
+) -> int:
+    """Set a new password for the signed-in user; returns how many other sessions ended.
+
+    The account row is locked first, so two simultaneous changes cannot both succeed
+    with the same current password. The session making the request is kept; every other
+    session of the user is ended. The caller owns the transaction.
+    """
+    # populate_existing: the caller's user object was loaded before this lock was
+    # taken, so its password hash may be stale. Re-read the row once it is locked.
+    locked = db.execute(
+        select(User)
+        .where(User.id == user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one()
+    if not verify_password(current, locked.password_hash):
+        raise IncorrectPassword
+    try:
+        validate_new_password(new, locked.email)
+    except PasswordPolicyError as exc:
+        raise AppError(str(exc), status_code=422, code="validation_error") from None
+    if verify_password(new, locked.password_hash):
+        raise AppError(
+            "The new password must be different from the current one.",
+            status_code=422,
+            code="validation_error",
+        )
+
+    locked.password_hash = hash_password(new)
+    ended = auth_service.revoke_user_sessions(
+        db, locked.id, except_session_id=keep_session_id
+    )
+    db.add(
+        AuditLog(
+            actor_user_id=locked.id,
+            action="user.password_change",
+            entity_type="user",
+            entity_id=locked.id,
+            changes={"other_sessions_ended": ended},
+        )
+    )
+    db.flush()
+    return ended

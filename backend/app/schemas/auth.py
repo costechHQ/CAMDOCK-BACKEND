@@ -32,3 +32,12 @@ class LoginResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"  # noqa: S105  (the scheme name)
     expires_at: datetime
     user: UserOut
+
+
+class PasswordChange(BaseModel):
+    """A signed-in user choosing a new password. Passwords are used exactly as sent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=1, max_length=1024)

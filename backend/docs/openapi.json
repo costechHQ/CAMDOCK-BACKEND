@@ -784,6 +784,30 @@
         "title": "ParentOverview",
         "type": "object"
       },
+      "PasswordChange": {
+        "additionalProperties": false,
+        "description": "A signed-in user choosing a new password. Passwords are used exactly as sent.",
+        "properties": {
+          "current_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "PasswordChange",
+        "type": "object"
+      },
       "PaymentCreate": {
         "additionalProperties": false,
         "description": "An instalment on an existing bill. The receipt number and date are server-owned.",
@@ -2175,6 +2199,42 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/change-password": {
+      "post": {
+        "description": "Change your own password. Your other sessions end; this one stays. A wrong\ncurrent password counts toward the same limit as a wrong sign-in password.",
+        "operationId": "change_password_api_v1_auth_change_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "The current password is wrong (code `incorrect_password`) or the new one is not acceptable."
+          },
+          "429": {
+            "description": "Too many wrong passwords; see the Retry-After header."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "login_api_v1_auth_login_post",

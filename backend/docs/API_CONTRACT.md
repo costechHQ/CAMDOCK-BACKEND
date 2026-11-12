@@ -16,6 +16,16 @@ This note covers the rules that the schema alone does not say. All paths are und
   `too_many_attempts` and a `Retry-After` header (seconds) for 15 minutes, even if the
   password is then correct. Wrong password, unknown email and disabled account all count
   the same. A successful login clears the email's count.
+- `POST /auth/change-password` lets any signed-in user change their own password:
+  send `{"current_password", "new_password"}`; the answer is **204** with no body.
+  Passwords are used exactly as sent (spaces included). The new one must be at
+  least 12 characters, not blank, not the account's email and different from the
+  current one (422 with the reason). A wrong current password is **422** with code
+  `incorrect_password` (not 401, so a frontend does not mistake it for an expired
+  session) and counts toward the same limit as a wrong sign-in password: after 5
+  wrong attempts the endpoint, and sign-in for that email, answer **429**
+  `too_many_attempts` with `Retry-After`. On success every *other* session of the
+  account ends; the one that made the request stays signed in.
 - Request rates are limited per client address, per minute. `GET /public/stats` allows
   30 and the whole API allows 300 (`GET /health` is exempt). Over the limit gives **429**
   with code `rate_limited` and a `Retry-After` header (seconds until the window ends).
