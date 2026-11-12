@@ -112,9 +112,31 @@ visitor address in `client=`; if it shows `172.28.0.10` (the proxy), the setting
 
   Never delete user rows: payments, results and the audit log refer to them.
 
-- **Reset a forgotten password:** *this version has no password-reset feature.* The
-  workable route today is to disable the old account and create a new one with a new
-  email. See "Known limits" below.
+- **Reset a forgotten password.** Another administrator issues a one-time code in
+  the portal (`POST /users/{id}/password-reset`), after confirming who is asking,
+  in person or on a number the school already holds. They give the person the code;
+  the person enters their email, the code and a new password on the reset screen
+  (`POST /auth/reset-password`). The code works once and expires after
+  `PASSWORD_RESET_TTL_HOURS` (24 by default). Using it ends all that account's
+  sessions, and the person signs in with the new password. Every issue and use is in
+  the audit log. Never put a code in a group chat or an email subject.
+
+- **The last administrator is locked out** (no one is left to issue a code). On the
+  server:
+
+  ```bash
+  dc run --rm api python -m app.cli reset-password --email head@school.example
+  ```
+
+  It shows the account and asks to confirm, then asks for the new password twice
+  (hidden, at least 12 characters). It ends that account's sessions, cancels any
+  unused reset code and records the action in the audit log with no signed-in user.
+  For a script, set `CAMDOCK_ADMIN_PASSWORD` (the name says admin, but it is the
+  password to set for whichever account you name) and pass `--yes`. It refuses a
+  disabled account; enable it first (see "Disable or re-enable an account"). If
+  the account had been blocked for too many wrong passwords, the block ends by
+  itself after 15 minutes, or immediately with `dc restart api`; the command cannot
+  clear it because blocks live in the API's memory.
 
 ## Storage you should look after
 
@@ -163,8 +185,8 @@ names.
 
 These are not faults, but you should know them:
 
-1. No password reset yet (the route today is to disable the old account and create a new
-   one with a new email).
+1. There is no self-service "forgot password" by email: a reset always needs an
+   administrator to hand over a code (email and SMS are out of the SRS scope).
 2. No payment void or refund.
 3. In-memory rate limiting and sign-in blocking (see above).
 4. Receipt numbers (`RCP-YYYY-NNNNNN`) are a proposal the school has not confirmed.

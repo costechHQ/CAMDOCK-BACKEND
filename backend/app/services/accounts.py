@@ -250,3 +250,56 @@ def change_own_password(
     )
     db.flush()
     return ended
+
+
+def find_resettable_account(db: Session, email: str) -> User:
+    """The active account with this email, for the server-side password reset.
+
+    Raises `AccountError` (safe to print) for a bad email, an unknown email or a
+    disabled account. This is an operator tool run on the server, so it may say which.
+    """
+    email = normalize_email(email)
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if user is None:
+        raise AccountError("No account with that email.")
+    if not user.is_active:
+        raise AccountError("That account is disabled. Enable it first.")
+    return user
+
+
+def reset_password_from_server(
+    db: Session, email: str, new_password: str
+) -> tuple[User, int]:
+    """Set a new password for an account from the server; returns it and how many
+    sessions ended. For when nobody can issue a reset code (the last administrator
+    locked out). Ends all the account's sessions, voids its live reset code and audits
+    the action as a system action with no signed-in user. The caller owns the
+    transaction.
+    """
+    email = normalize_email(email)
+    user = db.execute(
+        select(User)
+        .where(User.email == email)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if user is None:
+        raise AccountError("No account with that email.")
+    if not user.is_active:
+        raise AccountError("That account is disabled. Enable it first.")
+    validate_new_password(new_password, user.email)
+
+    user.password_hash = hash_password(new_password)
+    ended = auth_service.revoke_user_sessions(db, user.id)
+    password_resets.void_live_codes(db, user.id)
+    db.add(
+        AuditLog(
+            actor_user_id=None,
+            action="user.password_reset_cli",
+            entity_type="user",
+            entity_id=user.id,
+            changes={"email": user.email, "role": user.role, "sessions_ended": ended},
+        )
+    )
+    db.flush()
+    return user, ended
