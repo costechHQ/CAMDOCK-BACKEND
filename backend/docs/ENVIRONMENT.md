@@ -14,6 +14,7 @@ A test (`tests/test_docs.py`) fails if a setting is added to the code and not li
 | `DATABASE_URL` | none, **required** | SQLAlchemy URL, `postgresql+psycopg://user:password@host:5432/dbname`. The API will not start without it. |
 | `API_V1_PREFIX` | `/api/v1` | URL prefix of every endpoint. |
 | `SESSION_TTL_HOURS` | `12` | How long a sign-in lasts before the user must log in again. |
+| `PASSWORD_RESET_TTL_HOURS` | `24` | How long a password-reset code, issued by an administrator, stays valid. From 1 to 168. |
 | `LOGIN_MAX_FAILURES` | `5` | Failed sign-ins for one email, inside the window, before that email is blocked. |
 | `LOGIN_IP_MAX_FAILURES` | `20` | Failed sign-ins from one address, inside the window, before that address is blocked. |
 | `LOGIN_WINDOW_MINUTES` | `15` | The period failures are counted over. |

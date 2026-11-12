@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     database_url: SecretStr
     api_v1_prefix: str = "/api/v1"
     session_ttl_hours: int = Field(default=12, gt=0)
+    # How long a password-reset code handed out by an administrator stays valid.
+    password_reset_ttl_hours: int = Field(default=24, ge=1, le=168)
     # Failed sign-ins: this many inside the window blocks that email (or address).
     login_max_failures: int = Field(default=5, ge=1)
     login_ip_max_failures: int = Field(default=20, ge=1)

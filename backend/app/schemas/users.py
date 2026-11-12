@@ -43,3 +43,11 @@ class UserStatusUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     is_active: StrictBool
+
+
+class ResetCodeIssued(BaseModel):
+    """Shown once, to the administrator. The code cannot be retrieved afterwards."""
+
+    code: str
+    expires_at: datetime
+    user: UserOut

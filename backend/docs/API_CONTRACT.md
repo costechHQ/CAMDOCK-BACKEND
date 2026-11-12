@@ -87,6 +87,16 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
   account and returns it. Disabling ends all the account's sessions immediately;
   re-enabling does not restore them. Setting the value the account already has changes
   nothing. Only `is_active` is accepted (anything else is a 422).
+- `POST /users/{id}/password-reset` (no body) issues a one-time **reset code** for a
+  user who cannot sign in, to be handed to them by the administrator. The answer
+  is **201** with `{"code": "K7F2-9QXM-4PWD", "expires_at", "user"}`. **The code is
+  shown once** and cannot be retrieved later (only a hash is stored), so the frontend
+  must show it at once and not keep it. It is 12 letters and digits without
+  look-alikes, case and hyphens do not matter when typed, and it expires after
+  `PASSWORD_RESET_TTL_HOURS` (default 24). Issuing another code for the same account
+  voids the earlier one. Nothing about the account changes until the code is used.
+  **409** for your own account (use change-password) or a disabled account; **404**
+  for an unknown id.
 - **409** if an administrator tries to disable their own account, or an administrator
   whose disabling would leave no active administrator. **404** for an unknown id.
 

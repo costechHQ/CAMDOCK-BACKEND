@@ -1032,6 +1032,30 @@
         "title": "ReceiptStudent",
         "type": "object"
       },
+      "ResetCodeIssued": {
+        "description": "Shown once, to the administrator. The code cannot be retrieved afterwards.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/app__schemas__users__UserOut"
+          }
+        },
+        "required": [
+          "code",
+          "expires_at",
+          "user"
+        ],
+        "title": "ResetCodeIssued",
+        "type": "object"
+      },
       "ResultOut": {
         "properties": {
           "class_id": {
@@ -4094,6 +4118,54 @@
           }
         ],
         "summary": "Update User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/password-reset": {
+      "post": {
+        "description": "Issue a one-time reset code to hand to a user who cannot sign in. It is shown\nonce and expires; issuing another voids it. Not for your own account (409), nor for\na disabled one (409).",
+        "operationId": "issue_password_reset_api_v1_users__user_id__password_reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetCodeIssued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Issue Password Reset",
         "tags": [
           "users"
         ]

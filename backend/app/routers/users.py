@@ -7,13 +7,14 @@ from app.db.session import get_db
 from app.dependencies import require_roles
 from app.models import User
 from app.schemas.users import (
+    ResetCodeIssued,
     UserCreate,
     UserOut,
     UserPage,
     UserStatusUpdate,
     UserSummary,
 )
-from app.services import accounts
+from app.services import accounts, password_resets
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -58,3 +59,26 @@ def update_user(
     user = accounts.set_user_active(db, admin, user_id, body.is_active)
     db.commit()
     return user
+
+
+@router.post("/{user_id}/password-reset", status_code=201)
+def issue_password_reset(
+    user_id: int,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> ResetCodeIssued:
+    """Issue a one-time reset code to hand to a user who cannot sign in. It is shown
+    once and expires; issuing another voids it. Not for your own account (409), nor for
+    a disabled one (409)."""
+    issued = password_resets.issue_reset_code(db, admin, user_id)
+    db.commit()
+    return ResetCodeIssued(
+        code=issued.code,
+        expires_at=issued.expires_at,
+        user=UserOut(
+            id=issued.user.id,
+            email=issued.user.email,
+            role=issued.user.role,
+            is_active=issued.user.is_active,
+        ),
+    )
