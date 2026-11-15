@@ -1,13 +1,21 @@
 import re
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.core.security import PasswordPolicyError, hash_password, validate_new_password
+from app.core.security import (
+    PasswordPolicyError,
+    hash_password,
+    validate_new_password,
+    verify_password,
+)
 from app.models import AuditLog, User
-from app.schemas.users import UserCreate
+from app.schemas.users import UserCreate, UserPage, UserSummary
+from app.services import auth as auth_service
+from app.services import password_resets
+from app.services.search import name_contains
 
 EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 EMAIL_MAX_LENGTH = 254
@@ -81,3 +89,217 @@ def create_user(db: Session, actor: User, data: UserCreate) -> User:
         raise AppError(str(exc), status_code=409, code="conflict") from None
     except (AccountError, PasswordPolicyError) as exc:
         raise AppError(str(exc), status_code=422, code="validation_error") from None
+
+
+def list_users(
+    db: Session,
+    *,
+    q: str | None,
+    role: str | None,
+    is_active: bool | None,
+    limit: int,
+    offset: int,
+) -> UserPage:
+    """Accounts ordered by email then id, optionally narrowed by a part of the email,
+    the role or the active flag. The total counts every match, not just this page."""
+    conditions = []
+    if q and q.strip():
+        conditions.append(name_contains(User.email, q.strip()))
+    if role is not None:
+        conditions.append(User.role == role)
+    if is_active is not None:
+        conditions.append(User.is_active.is_(is_active))
+
+    total = db.execute(
+        select(func.count()).select_from(User).where(*conditions)
+    ).scalar_one()
+    users = (
+        db.execute(
+            select(User)
+            .where(*conditions)
+            .order_by(User.email, User.id)
+            .limit(limit)
+            .offset(offset)
+        )
+        .scalars()
+        .all()
+    )
+    return UserPage(
+        items=[UserSummary.model_validate(u) for u in users],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def set_user_active(
+    db: Session, actor: User, user_id: int, active: bool
+) -> UserSummary:
+    """Disable or re-enable an account and audit the change.
+
+    Disabling also ends the account's sessions, so re-enabling it does not bring old
+    tokens back. An administrator cannot disable themselves, and an administrator
+    cannot be disabled unless another one stays active. Setting the value an account
+    already has changes and records nothing. The caller owns the transaction.
+    """
+    role = db.execute(select(User.role).where(User.id == user_id)).scalar_one_or_none()
+    if role is None:
+        raise AppError("User not found.", status_code=404, code="not_found")
+    active_admins: list[int] = []
+    if not active and role == "admin":
+        # Lock every active administrator, in a fixed order, before counting how many
+        # would remain: two administrators disabling each other at once then queue
+        # instead of both succeeding (or deadlocking).
+        active_admins = list(
+            db.execute(
+                select(User.id)
+                .where(User.role == "admin", User.is_active.is_(True))
+                .order_by(User.id)
+                .with_for_update()
+            )
+            .scalars()
+            .all()
+        )
+    user = db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    ).scalar_one()
+
+    if user.is_active == active:
+        return UserSummary.model_validate(user)
+    if not active:
+        if user.id == actor.id:
+            raise AppError(
+                "You cannot disable your own account.",
+                status_code=409,
+                code="conflict",
+            )
+        if user.role == "admin" and not [i for i in active_admins if i != user.id]:
+            raise AppError(
+                "The last active administrator cannot be disabled.",
+                status_code=409,
+                code="conflict",
+            )
+
+    user.is_active = active
+    if not active:
+        auth_service.revoke_user_sessions(db, user.id)
+        # A code issued before the account was disabled must not come back to life
+        # when it is re-enabled.
+        password_resets.void_live_codes(db, user.id)
+    db.add(
+        AuditLog(
+            actor_user_id=actor.id,
+            action="user.enable" if active else "user.disable",
+            entity_type="user",
+            entity_id=user.id,
+            changes={"email": user.email, "role": user.role},
+        )
+    )
+    db.flush()
+    return UserSummary.model_validate(user)
+
+
+class IncorrectPassword(Exception):
+    """The current password given does not match; nothing was changed."""
+
+
+def change_own_password(
+    db: Session, user: User, keep_session_id: int, current: str, new: str
+) -> int:
+    """Set a new password for the signed-in user; returns how many other sessions ended.
+
+    The account row is locked first, so two simultaneous changes cannot both succeed
+    with the same current password. The session making the request is kept; every other
+    session of the user is ended. The caller owns the transaction.
+    """
+    # populate_existing: the caller's user object was loaded before this lock was
+    # taken, so its password hash may be stale. Re-read the row once it is locked.
+    locked = db.execute(
+        select(User)
+        .where(User.id == user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one()
+    if not verify_password(current, locked.password_hash):
+        raise IncorrectPassword
+    try:
+        validate_new_password(new, locked.email)
+    except PasswordPolicyError as exc:
+        raise AppError(str(exc), status_code=422, code="validation_error") from None
+    if verify_password(new, locked.password_hash):
+        raise AppError(
+            "The new password must be different from the current one.",
+            status_code=422,
+            code="validation_error",
+        )
+
+    locked.password_hash = hash_password(new)
+    # A reset code issued earlier must not outlive the password just chosen.
+    password_resets.void_live_codes(db, locked.id)
+    ended = auth_service.revoke_user_sessions(
+        db, locked.id, except_session_id=keep_session_id
+    )
+    db.add(
+        AuditLog(
+            actor_user_id=locked.id,
+            action="user.password_change",
+            entity_type="user",
+            entity_id=locked.id,
+            changes={"other_sessions_ended": ended},
+        )
+    )
+    db.flush()
+    return ended
+
+
+def find_resettable_account(db: Session, email: str) -> User:
+    """The active account with this email, for the server-side password reset.
+
+    Raises `AccountError` (safe to print) for a bad email, an unknown email or a
+    disabled account. This is an operator tool run on the server, so it may say which.
+    """
+    email = normalize_email(email)
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if user is None:
+        raise AccountError("No account with that email.")
+    if not user.is_active:
+        raise AccountError("That account is disabled. Enable it first.")
+    return user
+
+
+def reset_password_from_server(
+    db: Session, email: str, new_password: str
+) -> tuple[User, int]:
+    """Set a new password for an account from the server; returns it and how many
+    sessions ended. For when nobody can issue a reset code (the last administrator
+    locked out). Ends all the account's sessions, voids its live reset code and audits
+    the action as a system action with no signed-in user. The caller owns the
+    transaction.
+    """
+    email = normalize_email(email)
+    user = db.execute(
+        select(User)
+        .where(User.email == email)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if user is None:
+        raise AccountError("No account with that email.")
+    if not user.is_active:
+        raise AccountError("That account is disabled. Enable it first.")
+    validate_new_password(new_password, user.email)
+
+    user.password_hash = hash_password(new_password)
+    ended = auth_service.revoke_user_sessions(db, user.id)
+    password_resets.void_live_codes(db, user.id)
+    db.add(
+        AuditLog(
+            actor_user_id=None,
+            action="user.password_reset_cli",
+            entity_type="user",
+            entity_id=user.id,
+            changes={"email": user.email, "role": user.role, "sessions_ended": ended},
+        )
+    )
+    db.flush()
+    return user, ended

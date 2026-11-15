@@ -6,6 +6,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.logging import log_unexpected
+
 logger = logging.getLogger(__name__)
 
 STATUS_CODES = {
@@ -15,7 +17,10 @@ STATUS_CODES = {
     404: "not_found",
     405: "method_not_allowed",
     409: "conflict",
+    411: "length_required",
+    413: "payload_too_large",
     422: "validation_error",
+    429: "too_many_requests",
 }
 
 
@@ -31,9 +36,11 @@ class AppError(Exception):
         *,
         status_code: int | None = None,
         code: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
+        self.headers = headers
         if status_code is not None:
             self.status_code = status_code
         if code is not None:
@@ -54,7 +61,7 @@ def error_response(
 
 
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
-    return error_response(exc.status_code, exc.code, exc.message)
+    return error_response(exc.status_code, exc.code, exc.message, headers=exc.headers)
 
 
 async def http_exception_handler(
@@ -83,8 +90,12 @@ async def validation_error_handler(
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error(
-        "Unhandled exception on %s %s", request.method, request.url.path, exc_info=exc
+    log_unexpected(
+        logger,
+        "Unexpected error",
+        exc,
+        method=request.method,
+        path=request.url.path,
     )
     return error_response(500, "internal_error", "An internal error occurred.")
 

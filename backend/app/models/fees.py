@@ -64,6 +64,12 @@ class FeePayment(TimestampMixin, Base):
         CheckConstraint("amount > 0", name="amount_positive"),
         # Paid totals are summed per bill.
         Index("ix_fee_payments_fee_record_id", "fee_record_id"),
+        # A retry key is unique per admin; payments without a key (NULL) never clash.
+        UniqueConstraint(
+            "created_by",
+            "idempotency_key",
+            name="uq_fee_payments_created_by_idempotency_key",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -76,3 +82,4 @@ class FeePayment(TimestampMixin, Base):
     )
     receipt_number: Mapped[str] = mapped_column(String(40), unique=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    idempotency_key: Mapped[str | None] = mapped_column(String(64))

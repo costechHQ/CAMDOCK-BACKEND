@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
+from app.core.ratelimit import RateLimiter
 from app.models import SchoolClass, Student, Subject, User
 from tests.test_access_scope import add, link, make_class, make_student
 from tests.test_auth_api import add_user, bearer, login_token
@@ -264,6 +265,9 @@ def test_a_parent_cannot_reach_other_students_by_changing_ids(
     create_student(api_client, admin, full_name="Bola Ade", class_id=school["p2"])
     parent, headers = login_as(db, api_client, "parent")
     link(db, parent, own["id"])
+    # Ids keep growing across a full test run, so this probe can send hundreds of
+    # requests; lift the app-wide rate ceiling, which is not what is under test.
+    api_client.app.state.global_limiter = RateLimiter(100_000)
 
     reachable = [
         student_id

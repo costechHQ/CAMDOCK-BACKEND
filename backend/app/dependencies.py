@@ -2,10 +2,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.client_ip import client_ip
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.models import AuthSession, User
@@ -13,6 +15,19 @@ from app.models.accounts import USER_ROLES
 from app.services import auth as auth_service
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def limit_public_requests(request: Request) -> None:
+    """Per-address cap for endpoints that need no login."""
+    ip = client_ip(request, get_settings().trusted_proxy_networks)
+    wait = request.app.state.public_limiter.hit(ip)
+    if wait:
+        raise AppError(
+            "Too many requests. Try again later.",
+            status_code=429,
+            code="rate_limited",
+            headers={"Retry-After": str(wait)},
+        )
 
 
 @dataclass(frozen=True)

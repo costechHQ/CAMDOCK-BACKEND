@@ -306,11 +306,26 @@ def _paid_total(db: Session, fee_id: int) -> Decimal:
 def add_payment(
     db: Session, actor: User, fee_id: int, data: PaymentCreate
 ) -> PaymentResult:
+    """Record an instalment against a bill (see `record_payment`)."""
+    return record_payment(db, actor, fee_id, data)[0]
+
+
+def record_payment(
+    db: Session,
+    actor: User,
+    fee_id: int,
+    data: PaymentCreate,
+    idempotency_key: str | None = None,
+) -> tuple[PaymentResult, bool]:
     """Record an instalment against a bill and audit it; overpayment is refused.
 
     The bill row is locked before the paid total is read, so two simultaneous payments
     queue: the second sees the first's total and cannot push the sum past the amount
     billed. The caller owns the transaction (the lock lasts until it ends).
+
+    With an `idempotency_key`, a retry of the same request (same admin, bill and amount)
+    returns the payment already recorded and `False`, creating and auditing nothing. The
+    same key with a different bill or amount is a 409. Returns `(result, created)`.
     """
     fee = db.execute(
         select(FeeRecord).where(FeeRecord.id == fee_id).with_for_update()
@@ -319,6 +334,15 @@ def add_payment(
         raise AppError("Fee record not found.", status_code=404, code="not_found")
 
     amount = money.quantize(data.amount)
+    if idempotency_key is not None:
+        earlier = db.execute(
+            select(FeePayment).where(
+                FeePayment.created_by == actor.id,
+                FeePayment.idempotency_key == idempotency_key,
+            )
+        ).scalar_one_or_none()
+        if earlier is not None:
+            return _replay(db, earlier, fee.id, amount), False
     outstanding = money.quantize(fee.amount_billed) - money.quantize(
         _paid_total(db, fee.id)
     )
@@ -334,9 +358,18 @@ def add_payment(
         amount=amount,
         receipt_number=next_payment_number(db),
         created_by=actor.id,
+        idempotency_key=idempotency_key,
     )
-    db.add(payment)
-    db.flush()
+    try:
+        # A savepoint, so a clash on the key (the same key racing on another bill) can
+        # be answered without losing the caller's transaction.
+        with db.begin_nested():
+            db.add(payment)
+            db.flush()
+    except IntegrityError as error:
+        if idempotency_key is None:
+            raise
+        raise _key_reused() from error
     db.add(
         AuditLog(
             actor_user_id=actor.id,
@@ -352,8 +385,32 @@ def add_payment(
     )
     db.flush()
     loaded = load_fee(db, fee.id)
+    return (
+        PaymentResult(
+            payment=next(p for p in loaded.payments if p.id == payment.id), fee=loaded
+        ),
+        True,
+    )
+
+
+def _replay(
+    db: Session, earlier: FeePayment, fee_id: int, amount: Decimal
+) -> PaymentResult:
+    """The payment a retried request already created, or a 409 if the retry differs."""
+    if earlier.fee_record_id != fee_id or money.quantize(earlier.amount) != amount:
+        raise _key_reused()
+    loaded = load_fee(db, fee_id)
     return PaymentResult(
-        payment=next(p for p in loaded.payments if p.id == payment.id), fee=loaded
+        payment=next(p for p in loaded.payments if p.id == earlier.id), fee=loaded
+    )
+
+
+def _key_reused() -> AppError:
+    return AppError(
+        "This Idempotency-Key was already used for a different payment. "
+        "Use a new key for a new payment.",
+        status_code=409,
+        code="idempotency_key_reused",
     )
 
 

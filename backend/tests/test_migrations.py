@@ -37,6 +37,8 @@ REVISIONS = [
     "0008",
     "0009",
     "0010",
+    "0011",
+    "0012",
 ]
 
 pytestmark = pytest.mark.skipif(
@@ -177,6 +179,51 @@ def test_fee_numbering_and_uniqueness_are_created_and_dropped(clean_engine):
     with clean_engine.connect() as conn:
         assert conn.execute(sequences).scalars().all() == []
         assert conn.execute(constraint).scalars().all() == []
+        assert conn.execute(index).scalars().all() == []
+
+
+def test_payment_idempotency_key_is_created_and_dropped(clean_engine):
+    config = alembic_config()
+    column = text(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_name = 'fee_payments' AND column_name = 'idempotency_key'"
+    )
+    constraint = text(
+        "SELECT conname FROM pg_constraint "
+        "WHERE conname = 'uq_fee_payments_created_by_idempotency_key'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(column).scalars().all() == ["YES"]
+        assert conn.execute(constraint).scalars().all() == [
+            "uq_fee_payments_created_by_idempotency_key"
+        ]
+
+    command.downgrade(config, "0010")
+    with clean_engine.connect() as conn:
+        assert conn.execute(column).scalars().all() == []
+        assert conn.execute(constraint).scalars().all() == []
+
+
+def test_password_resets_are_created_and_dropped(clean_engine):
+    config = alembic_config()
+    table = text("SELECT to_regclass('public.password_resets')")
+    index = text(
+        "SELECT indexdef FROM pg_indexes "
+        "WHERE indexname = 'uq_password_resets_live_per_user'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(table).scalar() == "password_resets"
+        definition = conn.execute(index).scalar_one()
+    assert "UNIQUE" in definition
+    assert "used_at IS NULL" in definition and "voided_at IS NULL" in definition
+
+    command.downgrade(config, "0011")
+    with clean_engine.connect() as conn:
+        assert conn.execute(table).scalar() is None
         assert conn.execute(index).scalars().all() == []
 
 
