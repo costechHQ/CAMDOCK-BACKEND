@@ -159,9 +159,30 @@ def test_record_receipt_number_unique(db, ctx):
     )
 
 
-def test_same_student_term_and_type_may_be_billed_twice(db, ctx):
+def test_same_student_term_and_type_cannot_be_billed_twice(db, ctx):
     add_record(db, ctx)
-    add_record(db, ctx, receipt_number="REC-0002")
+    assert_rejected(
+        db,
+        insert(FeeRecord).values(
+            **ctx,
+            fee_type="Tuition Fee",
+            amount_billed=Decimal(100),
+            receipt_number="REC-0002",
+        ),
+        "uq_fee_records_student_id_term_id_fee_type",
+    )
+
+
+def test_other_types_and_other_terms_may_still_be_billed(db, ctx):
+    add_record(db, ctx)
+    add_record(db, ctx, fee_type="PTA Levy", receipt_number="REC-0002")
+    second_term = add(
+        db,
+        Term,
+        academic_year_id=db.execute(select(AcademicYear.id)).scalar_one(),
+        name="Second Term",
+    )
+    add_record(db, {**ctx, "term_id": second_term}, receipt_number="REC-0003")
 
 
 @pytest.mark.parametrize(

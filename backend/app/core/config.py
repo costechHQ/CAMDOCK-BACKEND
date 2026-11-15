@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     database_url: SecretStr
     api_v1_prefix: str = "/api/v1"
     session_ttl_hours: int = Field(default=12, gt=0)
+    # Printed on result sheets; the defaults are the values the SRS confirms.
+    school_name: str = Field(default="Camdock International School", min_length=1)
+    school_location: str = Field(default="Enugu State, Nigeria", min_length=1)
 
     @property
     def docs_enabled(self) -> bool:

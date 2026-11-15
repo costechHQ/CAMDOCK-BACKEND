@@ -6,6 +6,32 @@ from argon2.exceptions import InvalidHashError, VerificationError
 
 _hasher = PasswordHasher()  # argon2id with the library's default parameters
 
+PASSWORD_MIN_LENGTH = 12
+PASSWORD_MAX_LENGTH = 1024  # same cap the login request applies
+
+
+class PasswordPolicyError(ValueError):
+    """A new password is not acceptable; the message is safe to show."""
+
+
+def validate_new_password(password: str, email: str) -> None:
+    """Length and obvious-choice checks for a password being set (not for login).
+
+    No composition rules (digits, symbols): they do not make passwords stronger.
+    """
+    if not password.strip():
+        raise PasswordPolicyError("Password must not be blank.")
+    if len(password) < PASSWORD_MIN_LENGTH:
+        raise PasswordPolicyError(
+            f"Password must be at least {PASSWORD_MIN_LENGTH} characters."
+        )
+    if len(password) > PASSWORD_MAX_LENGTH:
+        raise PasswordPolicyError(
+            f"Password must be at most {PASSWORD_MAX_LENGTH} characters."
+        )
+    if password.strip().lower() == email.strip().lower():
+        raise PasswordPolicyError("Password must not be the same as the email.")
+
 
 def hash_password(plain: str) -> str:
     if not plain:

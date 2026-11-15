@@ -8,7 +8,15 @@ DB_URL = "postgresql+psycopg://user:s3cret-pw@localhost:5432/db"
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for name in ("ENVIRONMENT", "DATABASE_URL", "API_V1_PREFIX", "SESSION_TTL_HOURS"):
+    names = (
+        "ENVIRONMENT",
+        "DATABASE_URL",
+        "API_V1_PREFIX",
+        "SESSION_TTL_HOURS",
+        "SCHOOL_NAME",
+        "SCHOOL_LOCATION",
+    )
+    for name in names:
         monkeypatch.delenv(name, raising=False)
 
 
@@ -72,3 +80,26 @@ def test_secret_not_exposed_in_errors_or_repr(monkeypatch):
     with pytest.raises(ValidationError) as exc:
         make_settings()
     assert "s3cret-pw" not in str(exc.value)
+
+
+def test_school_details_default_to_the_srs_values_and_can_be_overridden(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", DB_URL)
+    settings = Settings(_env_file=None)
+    assert settings.school_name == "Camdock International School"
+    assert settings.school_location == "Enugu State, Nigeria"
+
+    monkeypatch.setenv("SCHOOL_NAME", "Another School")
+    monkeypatch.setenv("SCHOOL_LOCATION", "Awka, Nigeria")
+    settings = Settings(_env_file=None)
+    assert (settings.school_name, settings.school_location) == (
+        "Another School",
+        "Awka, Nigeria",
+    )
+
+
+@pytest.mark.parametrize("name", ["SCHOOL_NAME", "SCHOOL_LOCATION"])
+def test_school_details_must_not_be_empty(monkeypatch, name):
+    monkeypatch.setenv("DATABASE_URL", DB_URL)
+    monkeypatch.setenv(name, "")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

@@ -26,7 +26,18 @@ from tests.support import assert_safe_test_database
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 SCRATCH_DATABASE = "camdock_migrations_test"
-REVISIONS = ["0001", "0002", "0003", "0004", "0005", "0006", "0007"]
+REVISIONS = [
+    "0001",
+    "0002",
+    "0003",
+    "0004",
+    "0005",
+    "0006",
+    "0007",
+    "0008",
+    "0009",
+    "0010",
+]
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set; needs a Postgres test DB"
@@ -100,6 +111,73 @@ def test_upgrade_head_on_clean_database(clean_engine):
             text("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
         ).scalars()
         assert set(triggers) == {"audit_logs_append_only"}
+
+
+def test_student_number_sequence_is_created_and_dropped(clean_engine):
+    config = alembic_config()
+    query = text(
+        "SELECT sequencename FROM pg_sequences "
+        "WHERE sequencename = 'student_number_seq'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(query).scalars().all() == ["student_number_seq"]
+
+    command.downgrade(config, "0007")
+    with clean_engine.connect() as conn:
+        assert conn.execute(query).scalars().all() == []
+
+
+def test_results_term_class_index_is_created_and_dropped(clean_engine):
+    config = alembic_config()
+    query = text(
+        "SELECT indexdef FROM pg_indexes "
+        "WHERE tablename = 'results' AND indexname = 'ix_results_term_id_class_id'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        (definition,) = conn.execute(query).scalars().all()
+    assert "(term_id, class_id)" in definition
+
+    command.downgrade(config, "0008")
+    with clean_engine.connect() as conn:
+        assert conn.execute(query).scalars().all() == []
+
+
+def test_fee_numbering_and_uniqueness_are_created_and_dropped(clean_engine):
+    config = alembic_config()
+    sequences = text(
+        "SELECT sequencename FROM pg_sequences "
+        "WHERE sequencename IN ('fee_record_number_seq', 'fee_payment_number_seq') "
+        "ORDER BY sequencename"
+    )
+    constraint = text(
+        "SELECT conname FROM pg_constraint "
+        "WHERE conname = 'uq_fee_records_student_id_term_id_fee_type'"
+    )
+    index = text(
+        "SELECT indexname FROM pg_indexes "
+        "WHERE indexname = 'ix_fee_payments_fee_record_id'"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(sequences).scalars().all() == [
+            "fee_payment_number_seq",
+            "fee_record_number_seq",
+        ]
+        assert conn.execute(constraint).scalars().all() == [
+            "uq_fee_records_student_id_term_id_fee_type"
+        ]
+        assert conn.execute(index).scalars().all() == ["ix_fee_payments_fee_record_id"]
+
+    command.downgrade(config, "0009")
+    with clean_engine.connect() as conn:
+        assert conn.execute(sequences).scalars().all() == []
+        assert conn.execute(constraint).scalars().all() == []
+        assert conn.execute(index).scalars().all() == []
 
 
 def test_migrated_schema_matches_models(clean_engine):

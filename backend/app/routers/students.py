@@ -1,0 +1,106 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.dependencies import get_current_user, require_roles
+from app.models import User
+from app.schemas.parents import ParentLinkCreate, ParentLinkOut
+from app.schemas.results import ResultSheet, StudentResults
+from app.schemas.students import StudentCreate, StudentOut, StudentPage
+from app.services import parents as parent_service
+from app.services import results as result_service
+from app.services import sheets as sheet_service
+from app.services import students as student_service
+
+router = APIRouter(prefix="/students", tags=["students"])
+
+
+@router.post("", status_code=201)
+def create_student(
+    body: StudentCreate,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> StudentOut:
+    student = student_service.create_student(db, admin, body)
+    db.commit()
+    return student
+
+
+@router.get("")
+def list_students(
+    user: Annotated[User, Depends(require_roles("admin", "teacher"))],
+    db: Annotated[Session, Depends(get_db)],
+    q: Annotated[str | None, Query(max_length=100)] = None,
+    class_id: int | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> StudentPage:
+    """Admins see every student; teachers only those in their assigned classes."""
+    return student_service.list_students(
+        db, user, q=q, class_id=class_id, limit=limit, offset=offset
+    )
+
+
+@router.get("/{student_id}")
+def get_student(
+    student_id: int,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> StudentOut:
+    return student_service.get_student(db, user, student_id)
+
+
+@router.get("/{student_id}/results")
+def get_student_results(
+    student_id: int,
+    term_id: Annotated[int, Query(ge=1)],
+    user: Annotated[User, Depends(require_roles("admin", "teacher", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> StudentResults:
+    """A student's scores for a term: all subjects for admins and linked parents, only
+    the caller's own subjects for teachers."""
+    return result_service.student_results(db, user, student_id, term_id)
+
+
+@router.post("/{student_id}/parents", status_code=201)
+def link_parent(
+    student_id: int,
+    body: ParentLinkCreate,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> ParentLinkOut:
+    link = parent_service.link_parent(db, admin, student_id, body)
+    db.commit()
+    return link
+
+
+@router.get("/{student_id}/parents", dependencies=[Depends(require_roles("admin"))])
+def list_parents(
+    student_id: int, db: Annotated[Session, Depends(get_db)]
+) -> list[ParentLinkOut]:
+    return parent_service.list_parents(db, student_id)
+
+
+@router.delete("/{student_id}/parents/{parent_user_id}", status_code=204)
+def unlink_parent(
+    student_id: int,
+    parent_user_id: int,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> None:
+    parent_service.unlink_parent(db, admin, student_id, parent_user_id)
+    db.commit()
+
+
+@router.get("/{student_id}/result-sheet")
+def get_result_sheet(
+    student_id: int,
+    term_id: Annotated[int, Query(ge=1)],
+    user: Annotated[User, Depends(require_roles("admin", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> ResultSheet:
+    """Printable term sheet with every subject. Admins and a student's linked parents
+    only: teachers see their own subjects through the student results endpoint."""
+    return sheet_service.result_sheet(db, user, student_id, term_id)

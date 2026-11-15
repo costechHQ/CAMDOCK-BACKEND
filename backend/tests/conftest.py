@@ -5,9 +5,11 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db import session as session_module
+from app.db.session import get_db
 from app.main import create_app
 from tests.support import assert_safe_test_database
 
@@ -86,3 +88,25 @@ def db(migrated_engine):
     yield connection
     transaction.rollback()
     connection.close()
+
+
+@pytest.fixture
+def api_client(db, make_client):
+    """Client whose requests use their own Session inside the rolled-back `db`
+    transaction, so endpoint commits only release a savepoint."""
+
+    def override_get_db():
+        session = Session(
+            bind=db,
+            join_transaction_mode="create_savepoint",
+            autoflush=False,
+            expire_on_commit=False,
+        )
+        try:
+            yield session
+        finally:
+            session.close()
+
+    client = make_client()
+    client.app.dependency_overrides[get_db] = override_get_db
+    return client
