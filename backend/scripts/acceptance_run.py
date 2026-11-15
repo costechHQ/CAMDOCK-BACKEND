@@ -853,6 +853,9 @@ def run_checks(run: Run, admin_email: str, admin_password: str) -> None:
         ("POST", "/fees", fee_body(s1, "10")),
         ("GET", "/teachers", None),
         ("POST", f"/students/{s1['id']}/parents", {"parent_user_id": p1_user}),
+        ("GET", "/users", None),
+        ("PATCH", f"/users/{p1_user}", {"is_active": False}),
+        ("POST", f"/users/{p1_user}/password-reset", None),
     ]
     for method, path, body in admin_only:
         for who, token in (("teacher", t1), ("parent", p1)):
@@ -878,6 +881,8 @@ def run_checks(run: Run, admin_email: str, admin_password: str) -> None:
         run.call("GET", "/auth/me", t1).status_code == 200,
         "logging out one session ended another",
     )
+
+    recovery_checks(run, admin, make_user, login_as=lambda e, pw: login(run, e, pw))
 
     # Choosing a role or name is never enough.
     as_admin = run.call(
@@ -912,6 +917,184 @@ def run_checks(run: Run, admin_email: str, admin_password: str) -> None:
     # Nothing in the API stores or reads browser state.
     run.check(QUALITY[3], not run.cookies_seen, "the API set a cookie")
     run.check(QUALITY[3], not run.non_json_seen, "the API returned a non-JSON page")
+
+
+def recovery_checks(run: Run, admin: str, make_user, login_as) -> None:
+    """Password recovery and account status, recorded against the SRS criteria they
+    belong to: rejecting bad credentials, ending sessions, and keeping admin-only
+    actions admin-only."""
+    reset_url = "/auth/reset-password"
+    wrong_code = "ZZZZ-ZZZZ-ZZZZ"
+    invalid = "invalid_reset_code"
+
+    def sign_in(email: str, pw: str) -> str:
+        return token_of(login_as(email, pw))
+
+    def issue(user_id: int) -> httpx.Response:
+        return run.call("POST", f"/users/{user_id}/password-reset", admin)
+
+    def redeem(email: str, code: str, new_pw: str) -> httpx.Response:
+        return run.call(
+            "POST",
+            reset_url,
+            json={"email": email, "code": code, "new_password": new_pw},
+        )
+
+    # --- an administrator hands a locked-out user a one-time code ------------------
+    uid, email, old_pw = make_user("teacher")
+    other_uid, _, _ = make_user("parent")
+    first, second = sign_in(email, old_pw), sign_in(email, old_pw)
+    issued = issue(uid)
+    code = issued.json().get("code", "") if issued.status_code == 201 else ""
+    run.check(
+        AUTH[1],
+        issued.status_code == 201
+        and bool(code)
+        and bool(issued.json().get("expires_at")),
+        f"issuing a reset code gave {issued.status_code}",
+    )
+    new_pw = secrets.token_urlsafe(18)
+
+    bad = redeem(email, wrong_code, new_pw)
+    unknown = redeem(f"nobody-{secrets.token_hex(3)}@school.example", code, new_pw)
+    foreign_code = issue(other_uid).json().get("code", "")
+    foreign = redeem(email, foreign_code, new_pw)
+    for label, response in (
+        ("wrong", bad),
+        ("unknown email", unknown),
+        ("someone else's", foreign),
+    ):
+        run.check(
+            AUTH[1],
+            response.status_code == 422 and error_code(response) == invalid,
+            f"a {label} reset code gave {response.status_code} {error_code(response)}",
+        )
+    run.check(
+        AUTH[1],
+        bad.json() == unknown.json() == foreign.json(),
+        "different kinds of bad reset code gave different answers",
+    )
+    run.check(
+        AUTH[1],
+        login_as(email, new_pw).status_code == 401,
+        "the password changed although no valid code was used",
+    )
+
+    done = redeem(email, code.lower().replace("-", " "), new_pw)
+    run.check(
+        AUTH[0],
+        done.status_code == 204,
+        f"redeeming a valid code gave {done.status_code}",
+    )
+    run.check(
+        AUTH[0],
+        login_as(email, new_pw).status_code == 200,
+        "the new password does not sign in",
+    )
+    run.check(
+        AUTH[1],
+        login_as(email, old_pw).status_code == 401,
+        "the old password still signs in after a reset",
+    )
+    run.check(
+        AUTH[6],
+        run.call("GET", "/auth/me", first).status_code == 401
+        and run.call("GET", "/auth/me", second).status_code == 401,
+        "sessions survived a password reset",
+    )
+    again = redeem(email, code, secrets.token_urlsafe(18))
+    run.check(
+        AUTH[1],
+        again.status_code == 422 and error_code(again) == invalid,
+        f"a used reset code was accepted again ({again.status_code})",
+    )
+
+    # --- a user changes their own password -----------------------------------------
+    keep, drop = sign_in(email, new_pw), sign_in(email, new_pw)
+    chosen = secrets.token_urlsafe(18)
+    wrong = run.call(
+        "POST",
+        "/auth/change-password",
+        keep,
+        json={
+            "current_password": "not-the-password-" + secrets.token_hex(4),
+            "new_password": chosen,
+        },
+    )
+    run.check(
+        AUTH[1],
+        wrong.status_code == 422 and error_code(wrong) == "incorrect_password",
+        f"a wrong current password gave {wrong.status_code} {error_code(wrong)}",
+    )
+    changed = run.call(
+        "POST",
+        "/auth/change-password",
+        keep,
+        json={"current_password": new_pw, "new_password": chosen},
+    )
+    run.check(
+        AUTH[6],
+        changed.status_code == 204,
+        f"changing a password gave {changed.status_code}",
+    )
+    run.check(
+        AUTH[6],
+        run.call("GET", "/auth/me", keep).status_code == 200
+        and run.call("GET", "/auth/me", drop).status_code == 401,
+        "a password change did not keep this session and end the others",
+    )
+    run.check(
+        AUTH[1],
+        login_as(email, new_pw).status_code == 401
+        and login_as(email, chosen).status_code == 200,
+        "the old password still works after a change",
+    )
+
+    # --- disabling and re-enabling an account ---------------------------------------
+    victim, victim_email, victim_pw = make_user("teacher")
+    token = sign_in(victim_email, victim_pw)
+    disabled = run.call("PATCH", f"/users/{victim}", admin, json={"is_active": False})
+    run.check(
+        AUTH[6],
+        disabled.status_code == 200
+        and disabled.json().get("is_active") is False
+        and run.call("GET", "/auth/me", token).status_code == 401,
+        "disabling an account did not end its sessions",
+    )
+    run.check(
+        AUTH[1],
+        login_as(victim_email, victim_pw).status_code == 401,
+        "a disabled account could sign in",
+    )
+    run.check(
+        AUTH[1],
+        issue(victim).status_code == 409,
+        "a reset code was issued for a disabled account",
+    )
+    enabled = run.call("PATCH", f"/users/{victim}", admin, json={"is_active": True})
+    run.check(
+        AUTH[6],
+        enabled.status_code == 200
+        and run.call("GET", "/auth/me", token).status_code == 401
+        and login_as(victim_email, victim_pw).status_code == 200,
+        "re-enabling revived an old session, or the user could not sign in again",
+    )
+    me = run.call("GET", "/auth/me", admin).json()
+    own = run.call("PATCH", f"/users/{me['id']}", admin, json={"is_active": False})
+    own_code = issue(me["id"])
+    run.check(
+        AUTH[5],
+        own.status_code == 409 and own_code.status_code == 409,
+        f"an administrator could disable or reset themselves ({own.status_code}, {own_code.status_code})",
+    )
+    listing = run.call("GET", "/users", admin, params={"q": victim_email, "limit": 5})
+    items = listing.json().get("items", []) if listing.status_code == 200 else []
+    run.check(
+        AUTH[5],
+        [i["email"] for i in items] == [victim_email]
+        and "password" not in listing.text,
+        "the account list did not find the account, or exposed a credential",
+    )
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:

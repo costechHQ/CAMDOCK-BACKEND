@@ -41,8 +41,9 @@ development set-up and is not for real school data on the internet; use
 ## Status
 
 The backend covers the SRS scope: authentication and roles, students and teachers, results,
-fees and receipts, and dashboards, plus rate limiting, security headers, safe logging,
-health checks, and backup and deployment guides. Some things are deliberately not built
-yet, such as payment void or refund and password reset; the list is in
+fees and receipts, and dashboards, plus password recovery (an administrator hands over a
+one-time code), account disabling, rate limiting, security headers, safe logging, health
+checks, and backup and deployment guides. Some things are deliberately not built yet, such
+as payment void or refund and an email-based "forgot password"; the list is in
 [`OPERATIONS.md`](backend/docs/OPERATIONS.md#known-limits-of-this-version). The frontend
 is a separate piece of work.

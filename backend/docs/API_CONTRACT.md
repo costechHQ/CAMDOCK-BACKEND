@@ -113,6 +113,47 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
 - **409** if an administrator tries to disable their own account, or an administrator
   whose disabling would leave no active administrator. **404** for an unknown id.
 
+## Password recovery and account management: what the frontend builds
+
+There is no email or SMS in this system, so a forgotten password is recovered with a
+one-time code that an administrator hands to the person. The flow, as screens:
+
+**1. Administrator, in the account list**
+- Find the person with `GET /users?q=` (part of their email).
+- **Reset password** calls `POST /users/{id}/password-reset`. Show `code` and
+  `expires_at` straight away, in large type, with a copy button, and remind the
+  administrator to confirm who is asking before giving the code to that person only. The
+  code **cannot be fetched again**, so do not store it, log it or put it in a URL; issuing
+  another code voids the first. A 409 means it is the administrator's own account (they
+  use change password) or the account is disabled (offer **Enable**).
+- **Disable** and **Enable** call `PATCH /users/{id}` with `{"is_active": false|true}`.
+  Disabling signs the person out everywhere at once; enabling lets them sign in again
+  with their existing password.
+
+**2. Signed out: the "Forgot password?" link on the sign-in screen**
+- Explain that the school office gives a code. The form takes email, code and a new
+  password (ask twice and compare in the browser; the minimum is 12 characters).
+- `POST /auth/reset-password`:
+  - **204**: say the password was changed and go to the sign-in screen (the person is
+    not signed in).
+  - **422 `invalid_reset_code`**: "That code is not valid. Ask the school for a new one."
+    The server never says why (wrong, expired, used, replaced), and neither should the
+    screen.
+  - **422 `validation_error`**: show the `message`; the code still works, so let them
+    try another password.
+  - **429**: show that they must wait, using the `Retry-After` header (seconds).
+
+**3. Signed in: change password (profile screen)**
+- `POST /auth/change-password` with the current and the new password.
+  - **204**: say the other devices were signed out; this one stays signed in.
+  - **422 `incorrect_password`**: mark the current-password field. The person is **not**
+    signed out.
+  - **422 `validation_error`**: show the `message`.
+  - **429**: wait for `Retry-After`.
+
+**4. After any of these, a 401 on a later call means "sign in again".** A reset, a
+password change elsewhere and a disable all end sessions.
+
 ## Terms and fee totals
 
 - `term_id` is optional on the dashboard. Omitted, the server uses the current academic

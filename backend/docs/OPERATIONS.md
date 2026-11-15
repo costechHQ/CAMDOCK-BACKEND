@@ -178,6 +178,9 @@ names.
 | `api` keeps restarting; log says "Refusing to start" | A production check failed: placeholder database password, or a non-`https://` CORS origin. Fix `.env`, then `dc up -d`. |
 | The frontend shows a CORS error | Its exact origin (scheme, host, port; no trailing path) is not in `CORS_ALLOWED_ORIGINS`. Edit `.env`, then `dc up -d`. |
 | Everyone gets 429 | All users appear as one address: see `TRUSTED_PROXIES` above. |
+| A user says their reset code "does not work" | Codes work once, expire after `PASSWORD_RESET_TTL_HOURS`, and a newer code replaces an older one. The screen deliberately never says which. Check the email typed is the account's own, then issue a new code. |
+| A user gets 429 after typing codes | Five wrong codes block that email for 15 minutes. Wait, or `dc restart api` to clear it. |
+| No administrator can sign in | On the server, use `reset-password` (see "The last administrator is locked out" above). |
 | `dc up` says "Pool overlaps with other one" | `172.28.0.0/24` is already in use. Set `PROXY_SUBNET` and `PROXY_IP` in `.env` to an unused private range (for example `172.29.0.0/24` and `172.29.0.10`). |
 | Disk is full | Check `docker system df` and the backup folder; delete old backups beyond retention. |
 

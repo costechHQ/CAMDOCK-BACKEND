@@ -85,6 +85,8 @@ only what is missing and never overwrites edits. The subjects and their class ma
 the prototype's defaults, not the school's confirmed curriculum; check them with the
 school. The second command asks for a password twice (at least 12 characters) and
 creates the first administrator. Other accounts are created from inside the portal.
+If the only administrator ever forgets their password, [OPERATIONS.md](OPERATIONS.md)
+describes the server command that resets it.
 
 ## 5. Check it from outside
 

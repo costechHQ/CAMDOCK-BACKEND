@@ -10,7 +10,7 @@ The backend is feature-complete for the SRS scope and has been hardened for rele
 
 | Area | What exists |
 |---|---|
-| Accounts | Sign-in with bearer tokens stored as hashes, sign-out, three roles (admin, teacher, parent), failed-sign-in blocking. |
+| Accounts | Sign-in with bearer tokens stored as hashes, sign-out, three roles (admin, teacher, parent), failed-sign-in blocking, an account directory with disable and enable, changing your own password, and password recovery with one-time codes an administrator issues (plus a server command for a locked-out administrator). |
 | School records | Classes, subjects, academic years and terms, students, teachers and their assignments, parent-to-child links. |
 | Results | Score entry per student, subject and term, grades and averages, printable result sheets. |
 | Fees | Fee types, bills, instalment payments (with an idempotency key for safe retries), receipts, balances. |
