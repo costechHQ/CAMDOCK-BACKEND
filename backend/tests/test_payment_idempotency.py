@@ -290,14 +290,14 @@ def test_the_key_is_kept_off_the_audit_log(db, api_client, admin, school):
 
 def run_same_key(engine, committed, key, amounts, other_fee=None):
     """One request per amount at once, each in its own session, all using `key`."""
-    real_paid_total = fee_service._paid_total
+    real_paid_total = fee_service.paid_total
 
-    def slow_paid_total(db, fee_id):
-        total = real_paid_total(db, fee_id)
+    def slow_paid_total(db, fee_id, **kwargs):
+        total = real_paid_total(db, fee_id, **kwargs)
         time.sleep(0.3)
         return total
 
-    fee_service._paid_total = slow_paid_total
+    fee_service.paid_total = slow_paid_total
     start = threading.Barrier(len(amounts))
     outcomes: list[tuple[str, bool | int]] = []
     guard = threading.Lock()
@@ -329,7 +329,7 @@ def run_same_key(engine, committed, key, amounts, other_fee=None):
             thread.join(timeout=30)
             assert not thread.is_alive(), "a payment hung"
     finally:
-        fee_service._paid_total = real_paid_total
+        fee_service.paid_total = real_paid_total
     return outcomes
 
 

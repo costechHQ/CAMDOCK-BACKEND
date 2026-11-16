@@ -33,6 +33,7 @@ from app.schemas.fees import (
 )
 from app.schemas.results import SchoolInfo, TermRef
 from app.services import access, money
+from app.services.paid import paid_per_fee_subquery, paid_total
 from app.services.terms import require_term
 
 BILL_UNIQUE = "uq_fee_records_student_id_term_id_fee_type"
@@ -106,20 +107,22 @@ def _receipt(
     db: Session,
     fee: FeeOut,
     payments: list[PaymentOut],
+    paid: Decimal,
     *,
     receipt_number: str,
     issued: datetime,
     payment: PaymentOut | None,
 ) -> Receipt:
-    """A receipt over `payments`, the instalments counted so far; status and balance
-    come from `money` like every other fee response."""
+    """A receipt over `payments`, the instalments counted so far, with `paid` the
+    figure `paid.paid_total` gives for them; status and balance come from `money` like
+    every other fee response."""
     class_name = db.execute(
         select(SchoolClass.name)
         .join(Student, Student.class_id == SchoolClass.id)
         .where(Student.id == fee.student.id)
     ).scalar_one()
     settings = get_settings()
-    paid = money.quantize(sum((p.amount for p in payments), Decimal(0)))
+    paid = money.quantize(paid)
     return Receipt(
         school=SchoolInfo(name=settings.school_name, location=settings.school_location),
         receipt_number=receipt_number,
@@ -150,6 +153,7 @@ def bill_receipt(db: Session, user: User, fee_id: int) -> Receipt:
         db,
         fee,
         fee.payments,
+        fee.amount_paid,
         receipt_number=fee.receipt_number,
         issued=fee.recorded_at,
         payment=None,
@@ -166,25 +170,12 @@ def payment_receipt(db: Session, user: User, fee_id: int, payment_id: int) -> Re
                 db,
                 fee,
                 fee.payments[: index + 1],
+                paid_total(db, fee_id, through=payment_id),
                 receipt_number=payment.receipt_number,
                 issued=payment.paid_at,
                 payment=payment,
             )
     raise AppError("Payment not found.", status_code=404, code="not_found")
-
-
-def paid_per_fee_subquery():
-    """The sum of payments per bill, and the column to use for it (0 when unpaid).
-    Shared by the fee list and the dashboard so both total money the same way."""
-    paid_per_fee = (
-        select(
-            FeePayment.fee_record_id.label("fee_id"),
-            func.sum(FeePayment.amount).label("paid"),
-        )
-        .group_by(FeePayment.fee_record_id)
-        .subquery()
-    )
-    return paid_per_fee, func.coalesce(paid_per_fee.c.paid, 0)
 
 
 def list_fees(
@@ -280,7 +271,7 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
         .scalars()
         .all()
     )
-    paid = sum((p.amount for p in payments), Decimal(0))
+    paid = paid_total(db, fee.id)
     return FeeOut(
         **_summary_fields(fee, student, term, year, paid),
         payments=[
@@ -293,14 +284,6 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
             for p in payments
         ],
     )
-
-
-def _paid_total(db: Session, fee_id: int) -> Decimal:
-    return db.execute(
-        select(func.coalesce(func.sum(FeePayment.amount), 0)).where(
-            FeePayment.fee_record_id == fee_id
-        )
-    ).scalar_one()
 
 
 def add_payment(
@@ -344,7 +327,7 @@ def record_payment(
         if earlier is not None:
             return _replay(db, earlier, fee.id, amount), False
     outstanding = money.quantize(fee.amount_billed) - money.quantize(
-        _paid_total(db, fee.id)
+        paid_total(db, fee.id)
     )
     if outstanding <= 0:
         raise _payment_error("This fee has already been paid in full.")

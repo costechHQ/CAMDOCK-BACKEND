@@ -1,0 +1,270 @@
+# ruff: noqa: F811
+"""Every screen must show the same paid, balance and status for a bill.
+
+How much has been paid is worked out in `app/services/paid.py` only. These tests put
+bills in several states and check the bill, the list and its totals, the status filter,
+the receipts, the overpayment check and both dashboards against the same expected
+figures, so a rule that drifts on one surface is caught.
+"""
+
+import re
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+from app.models.fees import FEE_TYPES
+from tests.test_averages import admin, admin_login, school  # noqa: F401
+from tests.test_dashboard_parent import parent_for
+from tests.test_fee_receipts import bill, pay
+
+FEES = "/api/v1/fees"
+DASH = "/api/v1/dashboard/overview"
+APP = Path(__file__).resolve().parent.parent / "app"
+
+
+def m(value) -> str:
+    return f"{Decimal(str(value)):.2f}"
+
+
+def status_of(billed, paid) -> str:
+    if Decimal(str(paid)) == Decimal(str(billed)):
+        return "paid"
+    return "partial" if Decimal(str(paid)) > 0 else "due"
+
+
+def make_bills(api_client, admin, school):
+    """Ada's five first-term bills, each in a different state. Returns
+    {fee_id: (billed, paid)} with the paid figure written out by hand."""
+    expected = {}
+
+    due = bill(api_client, admin, school, "ada", "1000", fee_type=FEE_TYPES[0])
+    expected[due["id"]] = ("1000", "0")
+
+    partial = bill(
+        api_client,
+        admin,
+        school,
+        "ada",
+        "1000",
+        fee_type=FEE_TYPES[1],
+        amount_paid="400",
+    )
+    expected[partial["id"]] = ("1000", "400")
+
+    settled = bill(
+        api_client,
+        admin,
+        school,
+        "ada",
+        "600",
+        fee_type=FEE_TYPES[2],
+        amount_paid="600",
+    )
+    expected[settled["id"]] = ("600", "600")
+
+    instalments = bill(api_client, admin, school, "ada", "1000", fee_type=FEE_TYPES[3])
+    for amount in ("100", "250.50", "149.50"):
+        pay(api_client, admin, instalments["id"], amount)
+    expected[instalments["id"]] = ("1000", "500")
+
+    mixed = bill(
+        api_client,
+        admin,
+        school,
+        "ada",
+        "1000",
+        fee_type=FEE_TYPES[4],
+        amount_paid="250",
+    )
+    pay(api_client, admin, mixed["id"], "250")
+    expected[mixed["id"]] = ("1000", "500")
+    return expected
+
+
+def assert_same_everywhere(api_client, admin, parent, school, expected):
+    """`expected` is {fee_id: (billed, paid)}. Every surface must agree with it."""
+    total_billed = sum(Decimal(b) for b, _ in expected.values())
+    total_paid = sum(Decimal(p) for _, p in expected.values())
+
+    # the bill, and its receipt
+    for fee_id, (billed, paid) in expected.items():
+        detail = api_client.get(f"{FEES}/{fee_id}", headers=admin).json()
+        assert detail["amount_paid"] == m(paid), f"bill {fee_id}"
+        assert detail["balance"] == m(Decimal(billed) - Decimal(paid)), f"bill {fee_id}"
+        assert detail["status"] == status_of(billed, paid), f"bill {fee_id}"
+        receipt = api_client.get(f"{FEES}/{fee_id}/receipt", headers=admin).json()
+        assert receipt["amount_paid"] == m(paid), f"bill receipt {fee_id}"
+        assert receipt["balance"] == detail["balance"]
+        assert receipt["status"] == detail["status"]
+        # each instalment's receipt shows the running total up to that instalment
+        running = Decimal(0)
+        for payment in detail["payments"]:
+            running += Decimal(payment["amount"])
+            one = api_client.get(
+                f"{FEES}/{fee_id}/payments/{payment['id']}/receipt", headers=admin
+            ).json()
+            assert one["amount_paid"] == m(running), f"receipt {payment['id']}"
+            assert one["balance"] == m(Decimal(billed) - running)
+            assert one["status"] == status_of(billed, running)
+        assert running == Decimal(paid)
+
+    # the list, its totals, and the status filter
+    page = api_client.get(
+        FEES, headers=admin, params={"student_id": school["ada"], "limit": 100}
+    ).json()
+    assert {i["id"]: i["amount_paid"] for i in page["items"]} == {
+        fee_id: m(paid) for fee_id, (_, paid) in expected.items()
+    }
+    assert page["totals"] == {
+        "billed": m(total_billed),
+        "paid": m(total_paid),
+        "balance": m(total_billed - total_paid),
+    }
+    for wanted in ("paid", "partial", "due"):
+        listed = api_client.get(
+            FEES,
+            headers=admin,
+            params={"student_id": school["ada"], "status": wanted, "limit": 100},
+        ).json()
+        assert {i["id"] for i in listed["items"]} == {
+            fee_id for fee_id, (b, p) in expected.items() if status_of(b, p) == wanted
+        }, wanted
+        assert listed["totals"]["paid"] == m(
+            sum(Decimal(p) for b, p in expected.values() if status_of(b, p) == wanted)
+        )
+
+    # the admin dashboard, for the term and for all time
+    figures = {
+        "billed": m(total_billed),
+        "collected": m(total_paid),
+        "outstanding": m(total_billed - total_paid),
+    }
+    only_ada = api_client.get(
+        DASH, headers=admin, params={"term_id": school["term"]}
+    ).json()["fees"]
+    assert only_ada["term"] == figures
+    assert only_ada["all_time"] == figures
+
+    # the parent dashboard
+    child = api_client.get(
+        DASH, headers=parent, params={"term_id": school["term"]}
+    ).json()["children"][0]
+    assert child["fees"]["term"] == figures
+    assert child["fees"]["all_time"] == figures
+
+
+@pytest.fixture
+def parent(db, api_client, school):
+    return parent_for(db, api_client, [school["ada"]])[1]
+
+
+def test_every_surface_agrees_for_bills_in_every_state(
+    db, api_client, admin, school, parent
+):
+    expected = make_bills(api_client, admin, school)
+
+    assert_same_everywhere(api_client, admin, parent, school, expected)
+
+
+def test_every_surface_still_agrees_after_more_payments(
+    db, api_client, admin, school, parent
+):
+    expected = make_bills(api_client, admin, school)
+    fee_ids = list(expected)
+    pay(api_client, admin, fee_ids[0], "1000")  # a due bill becomes paid
+    pay(api_client, admin, fee_ids[1], "0.01")  # a partial bill gains a little
+    expected[fee_ids[0]] = ("1000", "1000")
+    expected[fee_ids[1]] = ("1000", "400.01")
+
+    assert_same_everywhere(api_client, admin, parent, school, expected)
+
+
+def test_an_empty_school_agrees_too(db, api_client, admin, school, parent):
+    page = api_client.get(FEES, headers=admin).json()
+
+    assert page["totals"] == {"billed": "0.00", "paid": "0.00", "balance": "0.00"}
+    assert api_client.get(DASH, headers=parent).json()["children"][0]["fees"][
+        "all_time"
+    ] == {"billed": "0.00", "collected": "0.00", "outstanding": "0.00"}
+
+
+def test_the_overpayment_check_uses_the_same_figure(db, api_client, admin, school):
+    fee = bill(api_client, admin, school, "ada", "1000", amount_paid="400")
+    too_much = api_client.post(
+        f"{FEES}/{fee['id']}/payments", headers=admin, json={"amount": "600.01"}
+    )
+    exact = api_client.post(
+        f"{FEES}/{fee['id']}/payments", headers=admin, json={"amount": "600.00"}
+    )
+
+    assert too_much.status_code == 422
+    assert "outstanding balance of 600.00" in too_much.json()["error"]["message"]
+    assert exact.status_code == 201
+    assert exact.json()["fee"]["status"] == "paid"
+    again = api_client.post(
+        f"{FEES}/{fee['id']}/payments", headers=admin, json={"amount": "0.01"}
+    )
+    assert again.status_code == 422
+    assert "already been paid in full" in again.json()["error"]["message"]
+
+
+def test_a_parent_sees_the_same_figures_on_receipts(
+    db, api_client, admin, school, parent
+):
+    fee = bill(api_client, admin, school, "ada", "1000", amount_paid="300")
+    pay(api_client, admin, fee["id"], "200")
+
+    mine = api_client.get(f"{FEES}/{fee['id']}/receipt", headers=parent).json()
+
+    assert mine["amount_paid"] == "500.00"
+    assert mine["balance"] == "500.00"
+    assert mine["status"] == "partial"
+
+
+def test_another_childs_bill_does_not_leak_into_the_totals(
+    db, api_client, admin, school, parent
+):
+    bill(api_client, admin, school, "ada", "1000", amount_paid="100")
+    bill(api_client, admin, school, "bola", "5000", amount_paid="4000")
+
+    child = api_client.get(
+        DASH, headers=parent, params={"term_id": school["term"]}
+    ).json()["children"][0]
+
+    assert child["fees"]["term"] == {
+        "billed": "1000.00",
+        "collected": "100.00",
+        "outstanding": "900.00",
+    }
+
+
+# --- structure: nothing else may work out a paid figure --------------------------------
+
+
+def python_files():
+    return [p for p in APP.rglob("*.py") if p.name != "paid.py"]
+
+
+def test_only_the_paid_module_adds_up_payment_amounts():
+    column = re.compile(r"FeePayment\.amount\b")
+    python_sum = re.compile(r"sum\([^\n]*\.amount\b")
+
+    offenders = []
+    for path in python_files():
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if column.search(line) or python_sum.search(line):
+                offenders.append(
+                    f"{path.relative_to(APP.parent)}:{number}: {line.strip()}"
+                )
+
+    assert not offenders, (
+        "Work out paid figures in app/services/paid.py only:\n" + "\n".join(offenders)
+    )
+
+
+def test_the_paid_module_is_where_the_sums_live():
+    text = (APP / "services" / "paid.py").read_text(encoding="utf-8")
+
+    assert "func.sum(FeePayment.amount)" in text
+    assert text.count("func.sum(FeePayment.amount)") == 2  # per bill, and one bill
