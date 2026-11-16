@@ -85,6 +85,23 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
   a different bill or amount returns **409** `idempotency_key_reused`. Keys belong to
   the admin who sent them and never expire. Without the header every call records a
   new payment.
+- **Voiding a payment entered by mistake.** `POST /fees/{id}/payments/{payment_id}/void`
+  with `{"reason": "..."}` (admin only; the reason is required, trimmed, 5 to 200
+  characters) answers **200** with the payment and the recomputed bill.
+  - The payment is **never deleted**. It stays in the bill's `payments` list with
+    `status: "voided"`, `voided_at` and, for administrators only, `void_reason`
+    (`null` for everyone else; a parent sees that a payment was voided, not why). Every
+    payment has `status` (`valid` or `voided`).
+  - A voided payment **never counts**: not in `amount_paid`, `balance`, `status`, the
+    list totals, the status filter or either dashboard. The bill can then be paid again.
+  - Its receipt still opens with `payment.status == "voided"`: stamp it VOID. A receipt's
+    "paid so far" counts live payments only, so a re-printed receipt can show less than
+    the first print; the voided entry stays in its `payments` list, flagged.
+  - Voiding a voided payment is harmless: **200**, nothing changes, the first reason is
+    kept. An unknown bill, an unknown payment and another bill's payment are all the same
+    **404**.
+  - Retrying the original payment with its `Idempotency-Key` after a void returns that
+    payment, marked voided (200); it does not record a new one.
 - **Averages** are strings with one decimal, rounded half up: `"60.9"`. `null` means
   nothing is recorded; it is never shown as zero.
 - **Lists** return `{items, total, limit, offset}`. `limit` defaults to 20, maximum 100.

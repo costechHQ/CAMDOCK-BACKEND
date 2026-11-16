@@ -15,6 +15,7 @@ from app.schemas.fees import (
     PaymentCreate,
     PaymentResult,
     Receipt,
+    VoidRequest,
 )
 from app.services import fees as fee_service
 
@@ -130,4 +131,26 @@ def add_payment(
     db.commit()
     if not created:
         response.status_code = 200
+    return result
+
+
+@router.post(
+    "/{fee_id}/payments/{payment_id}/void",
+    responses={
+        404: {"description": "No such payment on that bill."},
+        422: {"description": "The reason is missing or not 5 to 200 characters."},
+    },
+)
+def void_payment(
+    fee_id: int,
+    payment_id: int,
+    body: VoidRequest,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> PaymentResult:
+    """Void a payment entered by mistake. It stays in the bill's history, marked voided
+    with who, when and why, and no longer counts toward what has been paid. Repeating
+    the call changes nothing and keeps the first reason."""
+    result = fee_service.void_payment(db, admin, fee_id, payment_id, body.reason)
+    db.commit()
     return result

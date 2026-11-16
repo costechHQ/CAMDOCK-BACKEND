@@ -8,6 +8,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StrictInt,
+    StringConstraints,
     model_validator,
 )
 
@@ -69,11 +70,19 @@ class FeeStudent(BaseModel):
     full_name: str
 
 
+PaymentStatus = Literal["valid", "voided"]
+
+
 class PaymentOut(BaseModel):
     id: int
     receipt_number: str
     amount: Decimal  # two decimal places
     paid_at: datetime
+    # A voided payment stays in the history but never counts. Only administrators are
+    # told why: `void_reason` is null for everyone else.
+    status: PaymentStatus = "valid"
+    voided_at: datetime | None = None
+    void_reason: str | None = None
 
 
 FeeStatus = Literal["paid", "partial", "due"]
@@ -123,6 +132,17 @@ class PaymentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     amount: Amount
+
+
+class VoidRequest(BaseModel):
+    """Why a payment is being voided. The reason is kept on record and printed nowhere
+    except for administrators."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=5, max_length=200)
+    ]
 
 
 class PaymentResult(BaseModel):

@@ -23,6 +23,7 @@ def paid_per_fee_subquery():
             FeePayment.fee_record_id.label("fee_id"),
             func.sum(FeePayment.amount).label("paid"),
         )
+        .where(FeePayment.voided_at.is_(None))
         .group_by(FeePayment.fee_record_id)
         .subquery()
     )
@@ -32,11 +33,12 @@ def paid_per_fee_subquery():
 def paid_total(db: Session, fee_id: int, *, through: int | None = None) -> Decimal:
     """What has been paid on one bill.
 
-    With `through` (a payment id) it is the running total up to and including that
-    payment, in the order instalments were recorded (by time, then id): the figure an
-    instalment's receipt shows.
+    Voided payments never count. With `through` (a payment id) it is the running total
+    up to and including that payment, in the order instalments were recorded (by time,
+    then id): the figure an instalment's receipt shows. For a voided payment that total
+    leaves the payment itself out.
     """
-    conditions = [FeePayment.fee_record_id == fee_id]
+    conditions = [FeePayment.fee_record_id == fee_id, FeePayment.voided_at.is_(None)]
     if through is not None:
         anchor = db.execute(
             select(FeePayment.paid_at, FeePayment.id).where(

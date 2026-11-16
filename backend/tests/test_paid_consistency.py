@@ -17,6 +17,7 @@ from app.models.fees import FEE_TYPES
 from tests.test_averages import admin, admin_login, school  # noqa: F401
 from tests.test_dashboard_parent import parent_for
 from tests.test_fee_receipts import bill, pay
+from tests.test_payment_void import void
 
 FEES = "/api/v1/fees"
 DASH = "/api/v1/dashboard/overview"
@@ -100,7 +101,8 @@ def assert_same_everywhere(api_client, admin, parent, school, expected):
         # each instalment's receipt shows the running total up to that instalment
         running = Decimal(0)
         for payment in detail["payments"]:
-            running += Decimal(payment["amount"])
+            if payment["status"] == "valid":  # a voided payment never counts
+                running += Decimal(payment["amount"])
             one = api_client.get(
                 f"{FEES}/{fee_id}/payments/{payment['id']}/receipt", headers=admin
             ).json()
@@ -176,6 +178,55 @@ def test_every_surface_still_agrees_after_more_payments(
     pay(api_client, admin, fee_ids[1], "0.01")  # a partial bill gains a little
     expected[fee_ids[0]] = ("1000", "1000")
     expected[fee_ids[1]] = ("1000", "400.01")
+
+    assert_same_everywhere(api_client, admin, parent, school, expected)
+
+
+def test_every_surface_agrees_after_payments_are_voided(
+    db, api_client, admin, school, parent
+):
+    expected = make_bills(api_client, admin, school)
+    _due, _partial, settled, instalments, mixed = list(expected)
+
+    def payments_of(fee_id):
+        return api_client.get(f"{FEES}/{fee_id}", headers=admin).json()["payments"]
+
+    # a fully paid bill whose only payment was a mistake goes back to due
+    void(api_client, admin, settled, payments_of(settled)[0]["id"])
+    expected[settled] = ("600", "0")
+    # the middle instalment (250.50 of 100 + 250.50 + 149.50) is voided
+    void(api_client, admin, instalments, payments_of(instalments)[1]["id"])
+    expected[instalments] = ("1000", "249.50")
+    # the first payment of a bill with two (250 + 250)
+    void(api_client, admin, mixed, payments_of(mixed)[0]["id"])
+    expected[mixed] = ("1000", "250")
+
+    assert_same_everywhere(api_client, admin, parent, school, expected)
+
+
+def test_voiding_everything_leaves_every_surface_at_zero(
+    db, api_client, admin, school, parent
+):
+    expected = make_bills(api_client, admin, school)
+    for fee_id in list(expected):
+        for payment in api_client.get(f"{FEES}/{fee_id}", headers=admin).json()[
+            "payments"
+        ]:
+            void(api_client, admin, fee_id, payment["id"])
+        expected[fee_id] = (expected[fee_id][0], "0")
+
+    assert_same_everywhere(api_client, admin, parent, school, expected)
+
+
+def test_a_payment_after_a_void_is_counted_everywhere(
+    db, api_client, admin, school, parent
+):
+    expected = make_bills(api_client, admin, school)
+    _due, partial, _settled, _instalments, _mixed = list(expected)
+    first = api_client.get(f"{FEES}/{partial}", headers=admin).json()["payments"][0]
+    void(api_client, admin, partial, first["id"])
+    pay(api_client, admin, partial, "700")
+    expected[partial] = ("1000", "700")
 
     assert_same_everywhere(api_client, admin, parent, school, expected)
 

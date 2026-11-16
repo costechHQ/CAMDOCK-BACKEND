@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import and_, func, select
@@ -100,7 +100,17 @@ def get_fee(db: Session, user: User, fee_id: int) -> FeeOut:
     ).scalar_one_or_none()
     if visible is None:
         raise AppError("Fee record not found.", status_code=404, code="not_found")
-    return load_fee(db, visible)
+    fee = load_fee(db, visible)
+    if user.role != "admin":
+        # Why a payment was voided is for administrators; families see that it was.
+        fee = fee.model_copy(
+            update={
+                "payments": [
+                    p.model_copy(update={"void_reason": None}) for p in fee.payments
+                ]
+            }
+        )
+    return fee
 
 
 def _receipt(
@@ -280,6 +290,9 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
                 receipt_number=p.receipt_number,
                 amount=money.quantize(p.amount),
                 paid_at=p.paid_at,
+                status="voided" if p.voided_at is not None else "valid",
+                voided_at=p.voided_at,
+                void_reason=p.void_reason,
             )
             for p in payments
         ],
@@ -394,6 +407,58 @@ def _key_reused() -> AppError:
         "Use a new key for a new payment.",
         status_code=409,
         code="idempotency_key_reused",
+    )
+
+
+def void_payment(
+    db: Session, actor: User, fee_id: int, payment_id: int, reason: str
+) -> PaymentResult:
+    """Mark a payment as entered by mistake: it stays on record but never counts, and
+    who, when and why are kept. Voiding a voided payment changes nothing and keeps the
+    first reason. The bill row is locked as for any payment, so a void and a new payment
+    at the same moment cannot give a wrong total. The caller owns the transaction.
+    """
+    fee = db.execute(
+        select(FeeRecord)
+        .where(FeeRecord.id == fee_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    payment = (
+        None
+        if fee is None
+        else db.execute(
+            select(FeePayment)
+            .where(FeePayment.id == payment_id, FeePayment.fee_record_id == fee.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).scalar_one_or_none()
+    )
+    if fee is None or payment is None:
+        raise AppError("Payment not found.", status_code=404, code="not_found")
+
+    if payment.voided_at is None:
+        payment.voided_at = datetime.now(UTC)
+        payment.voided_by = actor.id
+        payment.void_reason = reason
+        db.add(
+            AuditLog(
+                actor_user_id=actor.id,
+                action="fee.payment.void",
+                entity_type="fee_payment",
+                entity_id=payment.id,
+                changes={
+                    "fee_record_id": fee.id,
+                    "amount": str(money.quantize(payment.amount)),
+                    "receipt_number": payment.receipt_number,
+                    "reason": reason,
+                },
+            )
+        )
+        db.flush()
+    loaded = load_fee(db, fee.id)
+    return PaymentResult(
+        payment=next(p for p in loaded.payments if p.id == payment.id), fee=loaded
     )
 
 

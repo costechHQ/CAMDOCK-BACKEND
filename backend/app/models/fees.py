@@ -70,6 +70,16 @@ class FeePayment(TimestampMixin, Base):
             "idempotency_key",
             name="uq_fee_payments_created_by_idempotency_key",
         ),
+        # A void records who, when and why together, or not at all.
+        CheckConstraint(
+            "(voided_at IS NULL) = (voided_by IS NULL) "
+            "AND (voided_at IS NULL) = (void_reason IS NULL)",
+            name="void_fields_together",
+        ),
+        CheckConstraint(
+            "void_reason IS NULL OR length(btrim(void_reason)) >= 5",
+            name="void_reason_length",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -83,3 +93,9 @@ class FeePayment(TimestampMixin, Base):
     receipt_number: Mapped[str] = mapped_column(String(40), unique=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     idempotency_key: Mapped[str | None] = mapped_column(String(64))
+    # Set once by a void. A voided payment stays on record but never counts.
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    voided_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    void_reason: Mapped[str | None] = mapped_column(String(200))

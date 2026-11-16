@@ -883,6 +883,38 @@
           "receipt_number": {
             "title": "Receipt Number",
             "type": "string"
+          },
+          "status": {
+            "default": "valid",
+            "enum": [
+              "valid",
+              "voided"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "void_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Void Reason"
+          },
+          "voided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided At"
           }
         },
         "required": [
@@ -2189,6 +2221,23 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VoidRequest": {
+        "additionalProperties": false,
+        "description": "Why a payment is being voided. The reason is kept on record and printed nowhere\nexcept for administrators.",
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "VoidRequest",
+        "type": "object"
+      },
       "app__schemas__auth__UserOut": {
         "properties": {
           "email": {
@@ -2993,6 +3042,69 @@
           }
         ],
         "summary": "Get Payment Receipt",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/{fee_id}/payments/{payment_id}/void": {
+      "post": {
+        "description": "Void a payment entered by mistake. It stays in the bill's history, marked voided\nwith who, when and why, and no longer counts toward what has been paid. Repeating\nthe call changes nothing and keeps the first reason.",
+        "operationId": "void_payment_api_v1_fees__fee_id__payments__payment_id__void_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fee_id",
+            "required": true,
+            "schema": {
+              "title": "Fee Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "payment_id",
+            "required": true,
+            "schema": {
+              "title": "Payment Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such payment on that bill."
+          },
+          "422": {
+            "description": "The reason is missing or not 5 to 200 characters."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Void Payment",
         "tags": [
           "fees"
         ]

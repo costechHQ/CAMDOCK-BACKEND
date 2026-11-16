@@ -39,6 +39,7 @@ REVISIONS = [
     "0010",
     "0011",
     "0012",
+    "0013",
 ]
 
 pytestmark = pytest.mark.skipif(
@@ -112,7 +113,7 @@ def test_upgrade_head_on_clean_database(clean_engine):
         triggers = conn.execute(
             text("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
         ).scalars()
-        assert set(triggers) == {"audit_logs_append_only"}
+        assert set(triggers) == {"audit_logs_append_only", "fee_payments_append_only"}
 
 
 def test_student_number_sequence_is_created_and_dropped(clean_engine):
@@ -225,6 +226,134 @@ def test_password_resets_are_created_and_dropped(clean_engine):
     with clean_engine.connect() as conn:
         assert conn.execute(table).scalar() is None
         assert conn.execute(index).scalars().all() == []
+
+
+def seed_a_payment(engine) -> int:
+    """One payment on one bill, through the models; returns the payment id."""
+    from datetime import date
+    from decimal import Decimal
+
+    from sqlalchemy import insert
+
+    from app.models import (
+        AcademicYear,
+        FeePayment,
+        FeeRecord,
+        SchoolClass,
+        Student,
+        Term,
+        User,
+    )
+
+    with engine.begin() as conn:
+
+        def add(model, **values) -> int:
+            return conn.execute(
+                insert(model).values(**values).returning(model.id)
+            ).scalar_one()
+
+        admin = add(User, email="a@camdock.test", password_hash="x", role="admin")
+        year = add(
+            AcademicYear,
+            name="2026/2027",
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 7, 31),
+        )
+        klass = add(SchoolClass, name="Primary 1", level="primary")
+        student = add(Student, student_number="S-1", full_name="Ada", class_id=klass)
+        term = add(Term, academic_year_id=year, name="First Term")
+        fee = add(
+            FeeRecord,
+            student_id=student,
+            term_id=term,
+            fee_type="Tuition Fee",
+            amount_billed=Decimal("100.00"),
+            receipt_number="FEE-T-1",
+            created_by=admin,
+        )
+        return add(
+            FeePayment,
+            fee_record_id=fee,
+            amount=Decimal("40.00"),
+            receipt_number="RCP-T-1",
+            created_by=admin,
+        )
+
+
+def test_payment_void_is_created_guarded_and_dropped(clean_engine):
+    config = alembic_config()
+    columns = text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = 'fee_payments' AND column_name LIKE 'void%' "
+        "ORDER BY column_name"
+    )
+    trigger = text(
+        "SELECT tgname FROM pg_trigger "
+        "WHERE tgrelid = 'fee_payments'::regclass AND NOT tgisinternal"
+    )
+    checks = text(
+        "SELECT conname FROM pg_constraint WHERE conrelid = 'fee_payments'::regclass "
+        "AND conname LIKE 'ck_fee_payments_void%' ORDER BY conname"
+    )
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(columns).scalars().all() == [
+            "void_reason",
+            "voided_at",
+            "voided_by",
+        ]
+        assert conn.execute(trigger).scalars().all() == ["fee_payments_append_only"]
+        assert conn.execute(checks).scalars().all() == [
+            "ck_fee_payments_void_fields_together",
+            "ck_fee_payments_void_reason_length",
+        ]
+
+    command.downgrade(config, "0012")
+    with clean_engine.connect() as conn:
+        assert conn.execute(columns).scalars().all() == []
+        assert conn.execute(trigger).scalars().all() == []
+        assert conn.execute(checks).scalars().all() == []
+
+
+def test_downgrade_keeps_the_data_and_the_payment_figures(clean_engine):
+    config = alembic_config()
+    command.upgrade(config, "head")
+    payment_id = seed_a_payment(clean_engine)
+
+    command.downgrade(config, "0012")
+
+    with clean_engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT amount, receipt_number FROM fee_payments WHERE id = :id"),
+            {"id": payment_id},
+        ).one()
+    assert (str(row.amount), row.receipt_number) == ("40.00", "RCP-T-1")
+
+
+def test_downgrade_refuses_while_voided_payments_exist(clean_engine):
+    config = alembic_config()
+    command.upgrade(config, "head")
+    payment_id = seed_a_payment(clean_engine)
+    with clean_engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE fee_payments SET voided_at = now(), "
+                "voided_by = (SELECT id FROM users LIMIT 1), "
+                "void_reason = 'entered in error' WHERE id = :id"
+            ),
+            {"id": payment_id},
+        )
+
+    with pytest.raises(Exception, match="voided payments exist"):
+        command.downgrade(config, "0012")
+
+    assert current_revision(clean_engine) == "0013"
+    with clean_engine.connect() as conn:
+        assert conn.execute(
+            text("SELECT voided_at IS NOT NULL FROM fee_payments WHERE id = :id"),
+            {"id": payment_id},
+        ).scalar()
 
 
 def test_migrated_schema_matches_models(clean_engine):
