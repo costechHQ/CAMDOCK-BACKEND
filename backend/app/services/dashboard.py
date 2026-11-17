@@ -31,8 +31,8 @@ from app.schemas.dashboard import (
 )
 from app.schemas.results import ClassRef, TermRef
 from app.services import access, money
-from app.services.fees import paid_per_fee_subquery
 from app.services.grading import mean, mean_from_sum, round_average
+from app.services.paid import paid_per_fee_subquery
 from app.services.terms import require_term
 
 

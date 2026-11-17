@@ -118,6 +118,7 @@ class Run:
         **kwargs: object,
     ) -> httpx.Response:
         headers = {"Authorization": f"Bearer {token}"} if token else {}
+        headers.update(kwargs.pop("headers", None) or {})  # type: ignore[arg-type]
         while True:
             response = self.http.request(method, API + path, headers=headers, **kwargs)
             self.requests += 1
@@ -883,6 +884,7 @@ def run_checks(run: Run, admin_email: str, admin_password: str) -> None:
     )
 
     recovery_checks(run, admin, make_user, login_as=lambda e, pw: login(run, e, pw))
+    reversal_checks(run, admin, admin_email, t1, p1, p2, s1, term["id"])
 
     # Choosing a role or name is never enough.
     as_admin = run.call(
@@ -1094,6 +1096,221 @@ def recovery_checks(run: Run, admin: str, make_user, login_as) -> None:
         [i["email"] for i in items] == [victim_email]
         and "password" not in listing.text,
         "the account list did not find the account, or exposed a credential",
+    )
+
+
+def reversal_checks(
+    run: Run,
+    admin: str,
+    admin_email: str,
+    teacher: str,
+    parent: str,
+    other_parent: str,
+    student: dict,
+    term_id: int,
+) -> None:
+    """Voiding and refunding payments, recorded against the fee criteria they belong
+    to. Uses its own bills, so it leaves the earlier fee checks alone."""
+
+    def new_bill(kind: str, amount: str, paid: str) -> dict:
+        body = {
+            "student_id": student["id"],
+            "term_id": term_id,
+            "fee_type": kind,
+            "amount_billed": amount,
+            "amount_paid": paid,
+        }
+        return run.call("POST", "/fees", admin, json=body).json()
+
+    def refund(
+        token, fee: dict, payment_id: int, amount, key=None, reason="refund test"
+    ):
+        headers = {"Idempotency-Key": key or f"acc-{secrets.token_hex(8)}"}
+        path = f"/fees/{fee['id']}/payments/{payment_id}/refund"
+        return run.call(
+            "POST",
+            path,
+            token,
+            headers=headers,
+            json={"amount": amount, "reason": reason},
+        )
+
+    def void(token, fee: dict, payment_id: int, reason="entered by mistake"):
+        path = f"/fees/{fee['id']}/payments/{payment_id}/void"
+        return run.call("POST", path, token, json={"reason": reason})
+
+    paid_bill = new_bill("Examination Fee", "1000", "1000")
+    pay_id = paid_bill["payments"][0]["id"]
+
+    # Only an administrator may reverse a payment; nothing changes when others try.
+    for who, token in (("teacher", teacher), ("parent", parent), ("anonymous", None)):
+        want = 401 if token is None else 403
+        for label, response in (
+            ("void", void(token, paid_bill, pay_id)),
+            ("refund", refund(token, paid_bill, pay_id, "10")),
+        ):
+            run.check(
+                FEES[0],
+                response.status_code == want,
+                f"{who} trying to {label} gave {response.status_code}",
+            )
+    untouched = run.call("GET", f"/fees/{paid_bill['id']}", admin).json()
+    run.check(
+        FEES[7],
+        untouched["amount_paid"] == "1000.00"
+        and untouched["history"][-1]["kind"] == "payment",
+        "a refused reversal changed the bill",
+    )
+
+    # Bad refunds are refused with a documented error and change nothing.
+    for bad in ("0", "-5", "abc", "1000.01", "10.999"):
+        response = refund(admin, paid_bill, pay_id, bad)
+        run.check(
+            FEES[1],
+            response.status_code == 422,
+            f"refunding {bad!r} gave {response.status_code}",
+        )
+    no_key = run.call(
+        "POST",
+        f"/fees/{paid_bill['id']}/payments/{pay_id}/refund",
+        admin,
+        json={"amount": "10", "reason": "refund test"},
+    )
+    short = refund(admin, paid_bill, pay_id, "10", reason="no")
+    run.check(
+        FEES[1],
+        no_key.status_code == 422 and short.status_code == 422,
+        f"no Idempotency-Key gave {no_key.status_code}, a 2-letter reason {short.status_code}",
+    )
+
+    # A part refund lowers what counts as paid; status and balance follow.
+    key = f"acc-{secrets.token_hex(8)}"
+    first = refund(admin, paid_bill, pay_id, "300", key=key)
+    fee = first.json().get("fee", {}) if first.status_code == 201 else {}
+    run.check(
+        FEES[3],
+        fee.get("amount_paid") == "700.00" and fee.get("balance") == "300.00",
+        f"after refunding 300 of 1000: {fee.get('amount_paid')} paid, {fee.get('balance')} left",
+    )
+    run.check(
+        FEES[2],
+        fee.get("status") == "partial",
+        f"a part-refunded paid bill is {fee.get('status')}, not partial",
+    )
+    retry = refund(admin, paid_bill, pay_id, "300", key=key)
+    now = run.call("GET", f"/fees/{paid_bill['id']}", admin).json()
+    run.check(
+        FEES[1],
+        retry.status_code == 200
+        and retry.json().get("refund") == first.json().get("refund")
+        and now["amount_paid"] == "700.00"
+        and len(now["refunds"]) == 1,
+        f"a retry with the same key gave {retry.status_code} or refunded twice",
+    )
+    reused = refund(admin, paid_bill, pay_id, "50", key=key)
+    run.check(
+        FEES[1],
+        reused.status_code == 409,
+        f"reusing a key for a different amount gave {reused.status_code}",
+    )
+    over = refund(admin, paid_bill, pay_id, "700.01")
+    run.check(
+        FEES[1],
+        over.status_code == 422,
+        f"refunding more than is left of the payment gave {over.status_code}",
+    )
+    blocked = void(admin, paid_bill, pay_id)
+    run.check(
+        FEES[1],
+        blocked.status_code == 409,
+        f"voiding a refunded payment gave {blocked.status_code}",
+    )
+    rest = refund(admin, paid_bill, pay_id, "700")
+    emptied = rest.json().get("fee", {}) if rest.status_code == 201 else {}
+    run.check(
+        FEES[2],
+        emptied.get("status") == "due" and emptied.get("amount_paid") == "0.00",
+        f"a fully refunded bill is {emptied.get('status')}",
+    )
+
+    # A void takes the payment out of the totals but keeps it on record.
+    voided_bill = new_bill("Development Levy", "500", "500")
+    void_id = voided_bill["payments"][0]["id"]
+    voided = void(admin, voided_bill, void_id)
+    after = voided.json().get("fee", {}) if voided.status_code == 200 else {}
+    run.check(
+        FEES[2],
+        after.get("status") == "due" and after.get("balance") == "500.00",
+        f"a voided payment left the bill {after.get('status')}",
+    )
+    run.check(
+        FEES[3],
+        after.get("amount_paid") == "0.00" and len(after.get("payments", [])) == 1,
+        "a voided payment still counted, or vanished from the record",
+    )
+    run.check(
+        FEES[1],
+        refund(admin, voided_bill, void_id, "10").status_code == 409,
+        "a voided payment could be refunded",
+    )
+
+    # Receipt numbers stay unique across payments, voids and refunds.
+    full = run.call("GET", f"/fees/{paid_bill['id']}", admin).json()
+    numbers = [full["receipt_number"]]
+    numbers += [p["receipt_number"] for p in full["payments"]]
+    numbers += [r["receipt_number"] for r in full["refunds"]]
+    run.check(
+        FEES[5],
+        len(numbers) == len(set(numbers))
+        and len(full["refunds"]) == 2
+        and all(r["receipt_number"].startswith("REF-") for r in full["refunds"]),
+        f"receipt numbers across a bill's reversals: {numbers}",
+    )
+
+    # Who did it: administrators see it; families and printed receipts never do.
+    kinds = [h["kind"] for h in full["history"]]
+    run.check(
+        FEES[7],
+        kinds == ["payment", "refund", "refund"]
+        and all(h["by"] == admin_email for h in full["history"]),
+        f"history {kinds} did not name the acting administrator",
+    )
+    seen = run.call("GET", f"/fees/{paid_bill['id']}", parent)
+    body = seen.json() if seen.status_code == 200 else {}
+    run.check(
+        FEES[4],
+        seen.status_code == 200
+        and [h["kind"] for h in body.get("history", [])] == kinds
+        and all(h["by"] is None and h["reason"] is None for h in body["history"])
+        and admin_email not in seen.text,
+        "a parent could not see the history, or saw who acted or why",
+    )
+    refund_id = full["refunds"][0]["id"]
+    receipts = [
+        run.call("GET", f"/fees/{paid_bill['id']}/refunds/{refund_id}/receipt", admin),
+        run.call("GET", f"/fees/{paid_bill['id']}/receipt", admin),
+        run.call("GET", f"/fees/{paid_bill['id']}/payments/{pay_id}/receipt", admin),
+    ]
+    run.check(
+        FEES[6],
+        all(r.status_code == 200 and admin_email not in r.text for r in receipts),
+        "a printed receipt failed, or carried an administrator's email",
+    )
+    own = run.call(
+        "GET", f"/fees/{paid_bill['id']}/refunds/{refund_id}/receipt", parent
+    )
+    stranger = run.call(
+        "GET", f"/fees/{paid_bill['id']}/refunds/{refund_id}/receipt", other_parent
+    )
+    missing = run.call(
+        "GET", f"/fees/{paid_bill['id']}/refunds/999999/receipt", other_parent
+    )
+    run.check(
+        AUTH[3],
+        own.status_code == 200
+        and stranger.status_code == 404
+        and stranger.json() == missing.json(),
+        "another family could reach a refund receipt, or tell it from an unknown one",
     )
 
 

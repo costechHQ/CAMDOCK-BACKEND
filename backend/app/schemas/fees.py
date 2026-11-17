@@ -8,6 +8,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StrictInt,
+    StringConstraints,
     model_validator,
 )
 
@@ -69,11 +70,59 @@ class FeeStudent(BaseModel):
     full_name: str
 
 
+PaymentStatus = Literal["valid", "voided"]
+# Why a payment is voided or refunded: required, trimmed, short enough to print.
+Reason = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=5, max_length=200)
+]
+
+
 class PaymentOut(BaseModel):
     id: int
     receipt_number: str
     amount: Decimal  # two decimal places
     paid_at: datetime
+    # A voided payment stays in the history but never counts. Only administrators are
+    # told why: `void_reason` is null for everyone else.
+    status: PaymentStatus = "valid"
+    voided_at: datetime | None = None
+    void_reason: str | None = None
+    # The administrator who voided it; administrators only, like the reason.
+    voided_by: str | None = None
+    # Money given back on this payment, and what could still be refunded (0 once voided).
+    refunded_amount: Decimal = Decimal("0.00")
+    refundable_amount: Decimal = Decimal("0.00")
+
+
+class RefundOut(BaseModel):
+    id: int
+    receipt_number: str  # REF-<year>-<6 digits>
+    payment_id: int
+    payment_receipt_number: str
+    amount: Decimal  # two decimal places
+    refunded_at: datetime
+    # Only administrators are told why: null for everyone else.
+    reason: str | None = None
+    # The administrator who recorded it; administrators only.
+    refunded_by: str | None = None
+
+
+HistoryKind = Literal["payment", "void", "refund"]
+
+
+class HistoryEntry(BaseModel):
+    """One event on a bill, so a screen need not merge the payment and refund lists.
+    A void is its own entry, dated when it happened. `reason` and `by` (the account
+    email) are for administrators only; everyone else gets null."""
+
+    kind: HistoryKind
+    at: datetime
+    receipt_number: str  # the payment's, or the refund's own REF- number
+    payment_id: int
+    refund_id: int | None = None
+    amount: Decimal  # two decimal places
+    reason: str | None = None
+    by: str | None = None
 
 
 FeeStatus = Literal["paid", "partial", "due"]
@@ -96,9 +145,14 @@ class FeeSummary(BaseModel):
 
 
 class FeeOut(FeeSummary):
-    """A bill with its instalments, oldest first."""
+    """A bill with its instalments and refunds, oldest first. `amount_paid` is live
+    payments less refunds; `amount_refunded` is the refunds alone."""
 
     payments: list[PaymentOut]
+    refunds: list[RefundOut] = []
+    amount_refunded: Decimal = Decimal("0.00")
+    # Every payment, void and refund in the order it happened.
+    history: list[HistoryEntry] = []
 
 
 class FeeTotals(BaseModel):
@@ -123,6 +177,15 @@ class PaymentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     amount: Amount
+
+
+class VoidRequest(BaseModel):
+    """Why a payment is being voided. The reason is kept on record and printed nowhere
+    except for administrators."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Reason
 
 
 class PaymentResult(BaseModel):
@@ -161,8 +224,42 @@ class Receipt(BaseModel):
     status: FeeStatus
     payment: PaymentOut | None = None
     payments: list[PaymentOut]
+    refunds: list[RefundOut] = []
     signatures: ReceiptSignatures
 
 
 class FeeTypes(BaseModel):
     items: list[str]
+
+
+class RefundRequest(BaseModel):
+    """Money to give back against a payment. The receipt number and date are server-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount: Amount
+    reason: Reason
+
+
+class RefundResult(BaseModel):
+    refund: RefundOut
+    payment: PaymentOut
+    fee: FeeOut
+
+
+class RefundReceipt(BaseModel):
+    """Printable data for a refund. The bill's figures are as they stand now."""
+
+    school: SchoolInfo
+    receipt_number: str
+    date: datetime
+    student: ReceiptStudent
+    term: TermRef
+    fee_type: str
+    refund: RefundOut
+    payment_receipt_number: str
+    amount_billed: Decimal  # two decimal places
+    amount_paid: Decimal
+    balance: Decimal
+    status: FeeStatus
+    signatures: ReceiptSignatures

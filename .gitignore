@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+
+# Editor swap files
+*.swp

@@ -85,6 +85,55 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
   a different bill or amount returns **409** `idempotency_key_reused`. Keys belong to
   the admin who sent them and never expire. Without the header every call records a
   new payment.
+- **Voiding a payment entered by mistake.** `POST /fees/{id}/payments/{payment_id}/void`
+  with `{"reason": "..."}` (admin only; the reason is required, trimmed, 5 to 200
+  characters) answers **200** with the payment and the recomputed bill.
+  - The payment is **never deleted**. It stays in the bill's `payments` list with
+    `status: "voided"`, `voided_at` and, for administrators only, `void_reason`
+    (`null` for everyone else; a parent sees that a payment was voided, not why). Every
+    payment has `status` (`valid` or `voided`).
+  - A voided payment **never counts**: not in `amount_paid`, `balance`, `status`, the
+    list totals, the status filter or either dashboard. The bill can then be paid again.
+  - Its receipt still opens with `payment.status == "voided"`: stamp it VOID. A receipt's
+    "paid so far" counts live payments only, so a re-printed receipt can show less than
+    the first print; the voided entry stays in its `payments` list, flagged.
+  - Voiding a voided payment is harmless: **200**, nothing changes, the first reason is
+    kept. An unknown bill, an unknown payment and another bill's payment are all the same
+    **404**.
+  - Retrying the original payment with its `Idempotency-Key` after a void returns that
+    payment, marked voided (200); it does not record a new one.
+- **Refunding money given back.** `POST /fees/{id}/payments/{payment_id}/refund` with
+  `{"amount": "...", "reason": "..."}` (admin only; amount in naira with at most two
+  decimals, reason required, trimmed, 5 to 200 characters) records money returned
+  against a payment. It answers **201** with `{refund, payment, fee}`.
+  - **The `Idempotency-Key` header is required** (8 to 64 letters, digits, `.`, `_` or
+    `-`; missing or malformed is a 422). Generate one per refund and send the same key
+    when retrying: the same key, payment and amount returns **200** with the original
+    refund and records nothing new; the same key for another payment or amount is a
+    **409** `idempotency_key_reused`. Keys belong to the administrator who sent them.
+  - A refund can be **any amount up to what is left of its payment** (`refundable_amount`
+    on the payment); more is a **422** that says how much is refundable. Several partial
+    refunds on one payment are allowed. A **voided payment cannot be refunded** (409), and
+    a **payment that has been refunded cannot be voided** (409).
+  - It gets its own number `REF-YYYY-NNNNNN` and its own printable receipt:
+    `GET /fees/{id}/refunds/{refund_id}/receipt` (administrators, and a parent for their
+    own child; anyone else gets the same 404 as for an unknown refund). The receipt shows
+    the refund, the number of the payment it came from, and the bill's figures as they
+    stand now.
+  - **What counts as paid is live payments less refunds.** `amount_paid`, `balance`,
+    `status`, the list totals, the status filter and both dashboards all follow, so a
+    refund makes the bill owe more and it can be paid again. A bill shows `refunds`
+    (oldest first) and `amount_refunded`; each payment shows `refunded_amount` and
+    `refundable_amount`; receipts list the refunds on the payments they cover.
+  - Parents see that a refund happened (number, amount, date) but `reason` is `null` for
+    them. A refund cannot be undone in the portal: if one was entered by mistake, record
+    a new payment for the same amount (both entries stay on record).
+  - **`history`** on `GET /fees/{id}` lists every payment, void and refund in the order
+    it happened (`kind` is `payment`, `void` or `refund`; a void is its own entry dated
+    when it was made). Administrators also get `by` (the email of the account that did
+    it; also `voided_by` on a payment and `refunded_by` on a refund) and the `reason`.
+    Everyone else gets `null` for those, so a family sees that something happened but
+    not who did it or why.
 - **Averages** are strings with one decimal, rounded half up: `"60.9"`. `null` means
   nothing is recorded; it is never shown as zero.
 - **Lists** return `{items, total, limit, offset}`. `limit` defaults to 20, maximum 100.

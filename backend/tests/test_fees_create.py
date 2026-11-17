@@ -85,6 +85,9 @@ def test_admin_bills_a_student_with_nothing_paid(db, api_client, admin, school):
         "status": "due",
         "recorded_at": out["recorded_at"],
         "payments": [],
+        "refunds": [],
+        "amount_refunded": "0.00",
+        "history": [],
     }
     assert counts(db) == (1, 0)
 

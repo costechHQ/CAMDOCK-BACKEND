@@ -77,14 +77,14 @@ def race(engine, committed, amounts, monkeypatch):
     The paid-total read is slowed down, so without a row lock every payment would read
     the same total before any of them inserted, and all would pass the overpayment check.
     """
-    real_paid_total = fee_service._paid_total
+    real_paid_total = fee_service.paid_total
 
-    def slow_paid_total(db, fee_id):
-        total = real_paid_total(db, fee_id)
+    def slow_paid_total(db, fee_id, **kwargs):
+        total = real_paid_total(db, fee_id, **kwargs)
         time.sleep(0.4)
         return total
 
-    monkeypatch.setattr(fee_service, "_paid_total", slow_paid_total)
+    monkeypatch.setattr(fee_service, "paid_total", slow_paid_total)
     start = threading.Barrier(len(amounts))
     outcomes: list[str] = []
     guard = threading.Lock()

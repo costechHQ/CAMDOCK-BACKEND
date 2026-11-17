@@ -298,7 +298,7 @@
         "type": "object"
       },
       "FeeOut": {
-        "description": "A bill with its instalments, oldest first.",
+        "description": "A bill with its instalments and refunds, oldest first. `amount_paid` is live\npayments less refunds; `amount_refunded` is the refunds alone.",
         "properties": {
           "amount_billed": {
             "title": "Amount Billed",
@@ -308,6 +308,11 @@
             "title": "Amount Paid",
             "type": "string"
           },
+          "amount_refunded": {
+            "default": "0.00",
+            "title": "Amount Refunded",
+            "type": "string"
+          },
           "balance": {
             "title": "Balance",
             "type": "string"
@@ -315,6 +320,14 @@
           "fee_type": {
             "title": "Fee Type",
             "type": "string"
+          },
+          "history": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "title": "History",
+            "type": "array"
           },
           "id": {
             "title": "Id",
@@ -335,6 +348,14 @@
             "format": "date-time",
             "title": "Recorded At",
             "type": "string"
+          },
+          "refunds": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RefundOut"
+            },
+            "title": "Refunds",
+            "type": "array"
           },
           "status": {
             "enum": [
@@ -564,6 +585,79 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HistoryEntry": {
+        "description": "One event on a bill, so a screen need not merge the payment and refund lists.\nA void is its own entry, dated when it happened. `reason` and `by` (the account\nemail) are for administrators only; everyone else gets null.",
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "kind": {
+            "enum": [
+              "payment",
+              "void",
+              "refund"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "payment_id": {
+            "title": "Payment Id",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "refund_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Id"
+          }
+        },
+        "required": [
+          "kind",
+          "at",
+          "receipt_number",
+          "payment_id",
+          "amount"
+        ],
+        "title": "HistoryEntry",
         "type": "object"
       },
       "LoginRequest": {
@@ -883,6 +977,59 @@
           "receipt_number": {
             "title": "Receipt Number",
             "type": "string"
+          },
+          "refundable_amount": {
+            "default": "0.00",
+            "title": "Refundable Amount",
+            "type": "string"
+          },
+          "refunded_amount": {
+            "default": "0.00",
+            "title": "Refunded Amount",
+            "type": "string"
+          },
+          "status": {
+            "default": "valid",
+            "enum": [
+              "valid",
+              "voided"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "void_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Void Reason"
+          },
+          "voided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided At"
+          },
+          "voided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided By"
           }
         },
         "required": [
@@ -979,6 +1126,14 @@
             "title": "Receipt Number",
             "type": "string"
           },
+          "refunds": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RefundOut"
+            },
+            "title": "Refunds",
+            "type": "array"
+          },
           "school": {
             "$ref": "#/components/schemas/SchoolInfo"
           },
@@ -1061,6 +1216,195 @@
           "class_name"
         ],
         "title": "ReceiptStudent",
+        "type": "object"
+      },
+      "RefundOut": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "payment_id": {
+            "title": "Payment Id",
+            "type": "integer"
+          },
+          "payment_receipt_number": {
+            "title": "Payment Receipt Number",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "refunded_at": {
+            "format": "date-time",
+            "title": "Refunded At",
+            "type": "string"
+          },
+          "refunded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunded By"
+          }
+        },
+        "required": [
+          "id",
+          "receipt_number",
+          "payment_id",
+          "payment_receipt_number",
+          "amount",
+          "refunded_at"
+        ],
+        "title": "RefundOut",
+        "type": "object"
+      },
+      "RefundReceipt": {
+        "description": "Printable data for a refund. The bill's figures are as they stand now.",
+        "properties": {
+          "amount_billed": {
+            "title": "Amount Billed",
+            "type": "string"
+          },
+          "amount_paid": {
+            "title": "Amount Paid",
+            "type": "string"
+          },
+          "balance": {
+            "title": "Balance",
+            "type": "string"
+          },
+          "date": {
+            "format": "date-time",
+            "title": "Date",
+            "type": "string"
+          },
+          "fee_type": {
+            "title": "Fee Type",
+            "type": "string"
+          },
+          "payment_receipt_number": {
+            "title": "Payment Receipt Number",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "refund": {
+            "$ref": "#/components/schemas/RefundOut"
+          },
+          "school": {
+            "$ref": "#/components/schemas/SchoolInfo"
+          },
+          "signatures": {
+            "$ref": "#/components/schemas/ReceiptSignatures"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "partial",
+              "due"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/ReceiptStudent"
+          },
+          "term": {
+            "$ref": "#/components/schemas/TermRef"
+          }
+        },
+        "required": [
+          "school",
+          "receipt_number",
+          "date",
+          "student",
+          "term",
+          "fee_type",
+          "refund",
+          "payment_receipt_number",
+          "amount_billed",
+          "amount_paid",
+          "balance",
+          "status",
+          "signatures"
+        ],
+        "title": "RefundReceipt",
+        "type": "object"
+      },
+      "RefundRequest": {
+        "additionalProperties": false,
+        "description": "Money to give back against a payment. The receipt number and date are server-owned.",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "decimal_places": 2,
+            "gt": 0,
+            "le": "9999999999.99",
+            "max_digits": 12,
+            "title": "Amount"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "reason"
+        ],
+        "title": "RefundRequest",
+        "type": "object"
+      },
+      "RefundResult": {
+        "properties": {
+          "fee": {
+            "$ref": "#/components/schemas/FeeOut"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentOut"
+          },
+          "refund": {
+            "$ref": "#/components/schemas/RefundOut"
+          }
+        },
+        "required": [
+          "refund",
+          "payment",
+          "fee"
+        ],
+        "title": "RefundResult",
         "type": "object"
       },
       "ResetCodeIssued": {
@@ -2189,6 +2533,23 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VoidRequest": {
+        "additionalProperties": false,
+        "description": "Why a payment is being voided. The reason is kept on record and printed nowhere\nexcept for administrators.",
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "VoidRequest",
+        "type": "object"
+      },
       "app__schemas__auth__UserOut": {
         "properties": {
           "email": {
@@ -2998,6 +3359,157 @@
         ]
       }
     },
+    "/api/v1/fees/{fee_id}/payments/{payment_id}/refund": {
+      "post": {
+        "description": "Record money given back against a payment: any amount up to what is left of it,\nwith a reason. It gets its own REF- receipt number and reduces what counts as paid.\nA voided payment cannot be refunded.",
+        "operationId": "refund_payment_api_v1_fees__fee_id__payments__payment_id__refund_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fee_id",
+            "required": true,
+            "schema": {
+              "title": "Fee Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "payment_id",
+            "required": true,
+            "schema": {
+              "title": "Payment Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Required. A unique value (8 to 64 letters, digits, `.`, `_` or `-`) per refund. Send the same value when retrying so money is never given back twice.",
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true,
+            "schema": {
+              "description": "Required. A unique value (8 to 64 letters, digits, `.`, `_` or `-`) per refund. Send the same value when retrying so money is never given back twice.",
+              "pattern": "^[A-Za-z0-9._-]{8,64}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResult"
+                }
+              }
+            },
+            "description": "A retry with the same Idempotency-Key: the refund that was already recorded, unchanged. Nothing new was created."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such payment on that bill."
+          },
+          "409": {
+            "description": "The payment is voided, or the Idempotency-Key was already used for a different payment or amount."
+          },
+          "422": {
+            "description": "The amount is more than what is left of the payment, or the reason or the Idempotency-Key is missing or invalid."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Refund Payment",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/{fee_id}/payments/{payment_id}/void": {
+      "post": {
+        "description": "Void a payment entered by mistake. It stays in the bill's history, marked voided\nwith who, when and why, and no longer counts toward what has been paid. Repeating\nthe call changes nothing and keeps the first reason.",
+        "operationId": "void_payment_api_v1_fees__fee_id__payments__payment_id__void_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fee_id",
+            "required": true,
+            "schema": {
+              "title": "Fee Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "payment_id",
+            "required": true,
+            "schema": {
+              "title": "Payment Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such payment on that bill."
+          },
+          "422": {
+            "description": "The reason is missing or not 5 to 200 characters."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Void Payment",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
     "/api/v1/fees/{fee_id}/receipt": {
       "get": {
         "description": "Printable receipt data for a bill; a parent only gets their own child's.",
@@ -3041,6 +3553,63 @@
           }
         ],
         "summary": "Get Receipt",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/{fee_id}/refunds/{refund_id}/receipt": {
+      "get": {
+        "description": "Printable data for a refund; a parent only gets their own child's.",
+        "operationId": "get_refund_receipt_api_v1_fees__fee_id__refunds__refund_id__receipt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fee_id",
+            "required": true,
+            "schema": {
+              "title": "Fee Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "refund_id",
+            "required": true,
+            "schema": {
+              "title": "Refund Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Refund Receipt",
         "tags": [
           "fees"
         ]
