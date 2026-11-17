@@ -90,6 +90,29 @@ jobs:
           echo "$headers" | grep -qi '^x-request-id:'
           ! echo "$headers" | grep -qi '^server:'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/docs)" = 404
+      - name: Load reference data and create a throwaway administrator
+        run: |
+          dc="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+          password="$(openssl rand -hex 16)"
+          echo "::add-mask::$password"
+          echo "ACCEPTANCE_ADMIN_PASSWORD=$password" >> "$GITHUB_ENV"
+          $dc run --rm api python -m app.db.seed \
+            --academic-year 2026/2027 --start-date 2026-09-07 --end-date 2027-07-23 --current
+          $dc run --rm -e CAMDOCK_ADMIN_PASSWORD="$password" api \
+            python -m app.cli create-admin --email acceptance@ci.example
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.5"
+      - name: Install the acceptance script's dependencies
+        working-directory: backend
+        run: uv sync --frozen
+      - name: SRS acceptance criteria against the production stack
+        working-directory: backend
+        run: |
+          uv run python scripts/acceptance_run.py \
+            --base-url http://127.0.0.1:8080 \
+            --admin-email acceptance@ci.example \
+            --confirm-writes
       - name: Show logs if something failed
         if: failure()
         run: docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --no-color --tail 100

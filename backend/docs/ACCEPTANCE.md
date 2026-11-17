@@ -198,8 +198,14 @@ in-process run as `tests/test_acceptance_doc.py`, not the production Docker stac
 `30 passed, 0 failed, 3 shown elsewhere (33 criteria, 252 requests)`. To prove these checks
 can fail, the API was broken three ways: a teacher allowed to refund (five criteria
 failed), parents shown who acted (one failed), and refund receipts carrying the
-administrator's email (one failed). Each was reverted afterwards. The two earlier recorded
-runs above were on the production stack at `0012`; this one was not repeated there.
+administrator's email (one failed). Each was reverted afterwards.
+
+The same script was then run against the production stack (`docker-compose.prod.yml`
+behind the proxy, over plain HTTP, brand-new database at `0014`): `30 passed, 0 failed,
+3 shown elsewhere (33 criteria, 267 requests)` in about 12 seconds. CI now does this on
+every push: the `image` job seeds the reference data, creates a throwaway administrator
+and runs the script against the stack it just built, so a regression in any criterion
+fails the build.
 
 ### Proof for the criteria not shown by HTTP
 
