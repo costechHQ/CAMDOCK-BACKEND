@@ -87,6 +87,8 @@ class PaymentOut(BaseModel):
     status: PaymentStatus = "valid"
     voided_at: datetime | None = None
     void_reason: str | None = None
+    # The administrator who voided it; administrators only, like the reason.
+    voided_by: str | None = None
     # Money given back on this payment, and what could still be refunded (0 once voided).
     refunded_amount: Decimal = Decimal("0.00")
     refundable_amount: Decimal = Decimal("0.00")
@@ -101,6 +103,26 @@ class RefundOut(BaseModel):
     refunded_at: datetime
     # Only administrators are told why: null for everyone else.
     reason: str | None = None
+    # The administrator who recorded it; administrators only.
+    refunded_by: str | None = None
+
+
+HistoryKind = Literal["payment", "void", "refund"]
+
+
+class HistoryEntry(BaseModel):
+    """One event on a bill, so a screen need not merge the payment and refund lists.
+    A void is its own entry, dated when it happened. `reason` and `by` (the account
+    email) are for administrators only; everyone else gets null."""
+
+    kind: HistoryKind
+    at: datetime
+    receipt_number: str  # the payment's, or the refund's own REF- number
+    payment_id: int
+    refund_id: int | None = None
+    amount: Decimal  # two decimal places
+    reason: str | None = None
+    by: str | None = None
 
 
 FeeStatus = Literal["paid", "partial", "due"]
@@ -129,6 +151,8 @@ class FeeOut(FeeSummary):
     payments: list[PaymentOut]
     refunds: list[RefundOut] = []
     amount_refunded: Decimal = Decimal("0.00")
+    # Every payment, void and refund in the order it happened.
+    history: list[HistoryEntry] = []
 
 
 class FeeTotals(BaseModel):

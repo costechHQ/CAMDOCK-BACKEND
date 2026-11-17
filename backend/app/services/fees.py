@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import and_, func, select
@@ -25,6 +25,7 @@ from app.schemas.fees import (
     FeeStudent,
     FeeSummary,
     FeeTotals,
+    HistoryEntry,
     PaymentCreate,
     PaymentOut,
     PaymentResult,
@@ -122,12 +123,29 @@ def get_fee(db: Session, user: User, fee_id: int) -> FeeOut:
         fee = fee.model_copy(
             update={
                 "payments": [
-                    p.model_copy(update={"void_reason": None}) for p in fee.payments
+                    p.model_copy(update={"void_reason": None, "voided_by": None})
+                    for p in fee.payments
                 ],
-                "refunds": [r.model_copy(update={"reason": None}) for r in fee.refunds],
+                "refunds": [
+                    r.model_copy(update={"reason": None, "refunded_by": None})
+                    for r in fee.refunds
+                ],
+                "history": [
+                    h.model_copy(update={"reason": None, "by": None})
+                    for h in fee.history
+                ],
             }
         )
     return fee
+
+
+def _without_actor(payment: PaymentOut) -> PaymentOut:
+    """A printed receipt never carries the email of the administrator who acted."""
+    return payment.model_copy(update={"voided_by": None})
+
+
+def _refund_without_actor(refund: RefundOut) -> RefundOut:
+    return refund.model_copy(update={"refunded_by": None})
 
 
 def _receipt(
@@ -163,9 +181,9 @@ def _receipt(
         amount_paid=paid,
         balance=money.quantize(money.balance(fee.amount_billed, paid)),
         status=money.status(fee.amount_billed, paid),
-        payment=payment,
-        payments=payments,
-        refunds=refunds,
+        payment=_without_actor(payment) if payment else None,
+        payments=[_without_actor(p) for p in payments],
+        refunds=[_refund_without_actor(r) for r in refunds],
         signatures=ReceiptSignatures(),
     )
 
@@ -237,7 +255,7 @@ def refund_receipt(
         ),
         term=fee.term,
         fee_type=fee.fee_type,
-        refund=refund,
+        refund=_refund_without_actor(refund),
         payment_receipt_number=refund.payment_receipt_number,
         amount_billed=fee.amount_billed,
         amount_paid=fee.amount_paid,
@@ -348,6 +366,13 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
         .where(FeeRefund.fee_record_id == fee.id)
         .order_by(FeeRefund.refunded_at, FeeRefund.id)
     ).all()
+    user_ids = {p.created_by for p in payments} | {
+        p.voided_by for p in payments if p.voided_by is not None
+    }
+    user_ids |= {r.created_by for r, _ in refund_rows}
+    emails = dict(
+        db.execute(select(User.id, User.email).where(User.id.in_(user_ids))).all()
+    )
 
     def payment_out(p: FeePayment) -> PaymentOut:
         given_back = money.quantize(refunded.get(p.id, Decimal(0)))
@@ -360,14 +385,72 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
             status="voided" if voided else "valid",
             voided_at=p.voided_at,
             void_reason=p.void_reason,
+            voided_by=emails.get(p.voided_by),
             refunded_amount=given_back,
             refundable_amount=Decimal("0.00")
             if voided
             else money.quantize(p.amount) - given_back,
         )
 
+    # Same-instant events keep the order a person would expect: payment, void, refund.
+    events: list[tuple[datetime, int, int, HistoryEntry]] = []
+    for p in payments:
+        amount = money.quantize(p.amount)
+        events.append(
+            (
+                p.paid_at,
+                0,
+                p.id,
+                HistoryEntry(
+                    kind="payment",
+                    at=p.paid_at,
+                    receipt_number=p.receipt_number,
+                    payment_id=p.id,
+                    amount=amount,
+                    by=emails.get(p.created_by),
+                ),
+            )
+        )
+        if p.voided_at is not None:
+            events.append(
+                (
+                    p.voided_at,
+                    1,
+                    p.id,
+                    HistoryEntry(
+                        kind="void",
+                        at=p.voided_at,
+                        receipt_number=p.receipt_number,
+                        payment_id=p.id,
+                        amount=amount,
+                        reason=p.void_reason,
+                        by=emails.get(p.voided_by),
+                    ),
+                )
+            )
+    for r, _ in refund_rows:
+        events.append(
+            (
+                r.refunded_at,
+                2,
+                r.id,
+                HistoryEntry(
+                    kind="refund",
+                    at=r.refunded_at,
+                    receipt_number=r.receipt_number,
+                    payment_id=r.fee_payment_id,
+                    refund_id=r.id,
+                    amount=money.quantize(r.amount),
+                    reason=r.reason,
+                    by=emails.get(r.created_by),
+                ),
+            )
+        )
+    events.sort(key=lambda e: e[:3])
+
     return FeeOut(
         **_summary_fields(fee, student, term, year, paid),
+        history=[e[3] for e in events],
         payments=[payment_out(p) for p in payments],
         refunds=[
             RefundOut(
@@ -378,6 +461,7 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
                 amount=money.quantize(r.amount),
                 refunded_at=r.refunded_at,
                 reason=r.reason,
+                refunded_by=emails.get(r.created_by),
             )
             for r, payment_receipt_number in refund_rows
         ],
@@ -530,7 +614,7 @@ def void_payment(
                 status_code=409,
                 code="conflict",
             )
-        payment.voided_at = datetime.now(UTC)
+        payment.voided_at = func.now()  # the database clock, like payments and refunds
         payment.voided_by = actor.id
         payment.void_reason = reason
         db.add(

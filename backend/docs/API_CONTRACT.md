@@ -128,6 +128,12 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
   - Parents see that a refund happened (number, amount, date) but `reason` is `null` for
     them. A refund cannot be undone in the portal: if one was entered by mistake, record
     a new payment for the same amount (both entries stay on record).
+  - **`history`** on `GET /fees/{id}` lists every payment, void and refund in the order
+    it happened (`kind` is `payment`, `void` or `refund`; a void is its own entry dated
+    when it was made). Administrators also get `by` (the email of the account that did
+    it; also `voided_by` on a payment and `refunded_by` on a refund) and the `reason`.
+    Everyone else gets `null` for those, so a family sees that something happened but
+    not who did it or why.
 - **Averages** are strings with one decimal, rounded half up: `"60.9"`. `null` means
   nothing is recorded; it is never shown as zero.
 - **Lists** return `{items, total, limit, offset}`. `limit` defaults to 20, maximum 100.

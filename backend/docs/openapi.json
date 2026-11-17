@@ -321,6 +321,14 @@
             "title": "Fee Type",
             "type": "string"
           },
+          "history": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "title": "History",
+            "type": "array"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -577,6 +585,79 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HistoryEntry": {
+        "description": "One event on a bill, so a screen need not merge the payment and refund lists.\nA void is its own entry, dated when it happened. `reason` and `by` (the account\nemail) are for administrators only; everyone else gets null.",
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "kind": {
+            "enum": [
+              "payment",
+              "void",
+              "refund"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "payment_id": {
+            "title": "Payment Id",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "refund_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Id"
+          }
+        },
+        "required": [
+          "kind",
+          "at",
+          "receipt_number",
+          "payment_id",
+          "amount"
+        ],
+        "title": "HistoryEntry",
         "type": "object"
       },
       "LoginRequest": {
@@ -938,6 +1019,17 @@
               }
             ],
             "title": "Voided At"
+          },
+          "voided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided By"
           }
         },
         "required": [
@@ -1163,6 +1255,17 @@
             "format": "date-time",
             "title": "Refunded At",
             "type": "string"
+          },
+          "refunded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunded By"
           }
         },
         "required": [
