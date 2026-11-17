@@ -102,6 +102,32 @@ input, including an unknown `term_id`), 411 and 413 (request body without a leng
     **404**.
   - Retrying the original payment with its `Idempotency-Key` after a void returns that
     payment, marked voided (200); it does not record a new one.
+- **Refunding money given back.** `POST /fees/{id}/payments/{payment_id}/refund` with
+  `{"amount": "...", "reason": "..."}` (admin only; amount in naira with at most two
+  decimals, reason required, trimmed, 5 to 200 characters) records money returned
+  against a payment. It answers **201** with `{refund, payment, fee}`.
+  - **The `Idempotency-Key` header is required** (8 to 64 letters, digits, `.`, `_` or
+    `-`; missing or malformed is a 422). Generate one per refund and send the same key
+    when retrying: the same key, payment and amount returns **200** with the original
+    refund and records nothing new; the same key for another payment or amount is a
+    **409** `idempotency_key_reused`. Keys belong to the administrator who sent them.
+  - A refund can be **any amount up to what is left of its payment** (`refundable_amount`
+    on the payment); more is a **422** that says how much is refundable. Several partial
+    refunds on one payment are allowed. A **voided payment cannot be refunded** (409), and
+    a **payment that has been refunded cannot be voided** (409).
+  - It gets its own number `REF-YYYY-NNNNNN` and its own printable receipt:
+    `GET /fees/{id}/refunds/{refund_id}/receipt` (administrators, and a parent for their
+    own child; anyone else gets the same 404 as for an unknown refund). The receipt shows
+    the refund, the number of the payment it came from, and the bill's figures as they
+    stand now.
+  - **What counts as paid is live payments less refunds.** `amount_paid`, `balance`,
+    `status`, the list totals, the status filter and both dashboards all follow, so a
+    refund makes the bill owe more and it can be paid again. A bill shows `refunds`
+    (oldest first) and `amount_refunded`; each payment shows `refunded_amount` and
+    `refundable_amount`; receipts list the refunds on the payments they cover.
+  - Parents see that a refund happened (number, amount, date) but `reason` is `null` for
+    them. A refund cannot be undone in the portal: if one was entered by mistake, record
+    a new payment for the same amount (both entries stay on record).
 - **Averages** are strings with one decimal, rounded half up: `"60.9"`. `null` means
   nothing is recorded; it is never shown as zero.
 - **Lists** return `{items, total, limit, offset}`. `limit` defaults to 20, maximum 100.

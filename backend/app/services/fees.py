@@ -12,6 +12,7 @@ from app.models import (
     AuditLog,
     FeePayment,
     FeeRecord,
+    FeeRefund,
     SchoolClass,
     Student,
     Term,
@@ -30,10 +31,19 @@ from app.schemas.fees import (
     Receipt,
     ReceiptSignatures,
     ReceiptStudent,
+    RefundOut,
+    RefundReceipt,
+    RefundRequest,
+    RefundResult,
 )
 from app.schemas.results import SchoolInfo, TermRef
 from app.services import access, money
-from app.services.paid import paid_per_fee_subquery, paid_total
+from app.services.paid import (
+    paid_per_fee_subquery,
+    paid_total,
+    refunded_on_payment,
+    refunded_per_payment,
+)
 from app.services.terms import require_term
 
 BILL_UNIQUE = "uq_fee_records_student_id_term_id_fee_type"
@@ -51,6 +61,12 @@ def next_payment_number(db: Session) -> str:
     """`RCP-<year>-<6 digits>` from its own sequence, with the same properties."""
     number = db.execute(select(func.nextval("fee_payment_number_seq"))).scalar_one()
     return f"RCP-{date.today().year}-{number:06d}"
+
+
+def next_refund_number(db: Session) -> str:
+    """`REF-<year>-<6 digits>` from its own sequence, with the same properties."""
+    number = db.execute(select(func.nextval("fee_refund_number_seq"))).scalar_one()
+    return f"REF-{date.today().year}-{number:06d}"
 
 
 def _is_billed(db: Session, student_id: int, term_id: int, fee_type: str) -> bool:
@@ -107,7 +123,8 @@ def get_fee(db: Session, user: User, fee_id: int) -> FeeOut:
             update={
                 "payments": [
                     p.model_copy(update={"void_reason": None}) for p in fee.payments
-                ]
+                ],
+                "refunds": [r.model_copy(update={"reason": None}) for r in fee.refunds],
             }
         )
     return fee
@@ -122,15 +139,12 @@ def _receipt(
     receipt_number: str,
     issued: datetime,
     payment: PaymentOut | None,
+    refunds: list[RefundOut],
 ) -> Receipt:
     """A receipt over `payments`, the instalments counted so far, with `paid` the
     figure `paid.paid_total` gives for them; status and balance come from `money` like
     every other fee response."""
-    class_name = db.execute(
-        select(SchoolClass.name)
-        .join(Student, Student.class_id == SchoolClass.id)
-        .where(Student.id == fee.student.id)
-    ).scalar_one()
+    class_name = _class_name(db, fee.student.id)
     settings = get_settings()
     paid = money.quantize(paid)
     return Receipt(
@@ -151,6 +165,7 @@ def _receipt(
         status=money.status(fee.amount_billed, paid),
         payment=payment,
         payments=payments,
+        refunds=refunds,
         signatures=ReceiptSignatures(),
     )
 
@@ -167,6 +182,7 @@ def bill_receipt(db: Session, user: User, fee_id: int) -> Receipt:
         receipt_number=fee.receipt_number,
         issued=fee.recorded_at,
         payment=None,
+        refunds=fee.refunds,
     )
 
 
@@ -176,16 +192,59 @@ def payment_receipt(db: Session, user: User, fee_id: int, payment_id: int) -> Re
     fee = get_fee(db, user, fee_id)
     for index, payment in enumerate(fee.payments):
         if payment.id == payment_id:
+            so_far = fee.payments[: index + 1]
+            shown = {p.id for p in so_far}
             return _receipt(
                 db,
                 fee,
-                fee.payments[: index + 1],
+                so_far,
                 paid_total(db, fee_id, through=payment_id),
                 receipt_number=payment.receipt_number,
                 issued=payment.paid_at,
                 payment=payment,
+                refunds=[r for r in fee.refunds if r.payment_id in shown],
             )
     raise AppError("Payment not found.", status_code=404, code="not_found")
+
+
+def _class_name(db: Session, student_id: int) -> str:
+    return db.execute(
+        select(SchoolClass.name)
+        .join(Student, Student.class_id == SchoolClass.id)
+        .where(Student.id == student_id)
+    ).scalar_one()
+
+
+def refund_receipt(
+    db: Session, user: User, fee_id: int, refund_id: int
+) -> RefundReceipt:
+    """The receipt for one refund, with the bill's figures as they stand now. A refund
+    of another bill is a 404 like any unknown one."""
+    fee = get_fee(db, user, fee_id)
+    refund = next((r for r in fee.refunds if r.id == refund_id), None)
+    if refund is None:
+        raise AppError("Refund not found.", status_code=404, code="not_found")
+    settings = get_settings()
+    return RefundReceipt(
+        school=SchoolInfo(name=settings.school_name, location=settings.school_location),
+        receipt_number=refund.receipt_number,
+        date=refund.refunded_at,
+        student=ReceiptStudent(
+            id=fee.student.id,
+            student_number=fee.student.student_number,
+            full_name=fee.student.full_name,
+            class_name=_class_name(db, fee.student.id),
+        ),
+        term=fee.term,
+        fee_type=fee.fee_type,
+        refund=refund,
+        payment_receipt_number=refund.payment_receipt_number,
+        amount_billed=fee.amount_billed,
+        amount_paid=fee.amount_paid,
+        balance=fee.balance,
+        status=fee.status,
+        signatures=ReceiptSignatures(),
+    )
 
 
 def list_fees(
@@ -282,20 +341,47 @@ def load_fee(db: Session, fee_id: int) -> FeeOut:
         .all()
     )
     paid = paid_total(db, fee.id)
+    refunded = refunded_per_payment(db, fee.id)
+    refund_rows = db.execute(
+        select(FeeRefund, FeePayment.receipt_number)
+        .join(FeePayment, FeePayment.id == FeeRefund.fee_payment_id)
+        .where(FeeRefund.fee_record_id == fee.id)
+        .order_by(FeeRefund.refunded_at, FeeRefund.id)
+    ).all()
+
+    def payment_out(p: FeePayment) -> PaymentOut:
+        given_back = money.quantize(refunded.get(p.id, Decimal(0)))
+        voided = p.voided_at is not None
+        return PaymentOut(
+            id=p.id,
+            receipt_number=p.receipt_number,
+            amount=money.quantize(p.amount),
+            paid_at=p.paid_at,
+            status="voided" if voided else "valid",
+            voided_at=p.voided_at,
+            void_reason=p.void_reason,
+            refunded_amount=given_back,
+            refundable_amount=Decimal("0.00")
+            if voided
+            else money.quantize(p.amount) - given_back,
+        )
+
     return FeeOut(
         **_summary_fields(fee, student, term, year, paid),
-        payments=[
-            PaymentOut(
-                id=p.id,
-                receipt_number=p.receipt_number,
-                amount=money.quantize(p.amount),
-                paid_at=p.paid_at,
-                status="voided" if p.voided_at is not None else "valid",
-                voided_at=p.voided_at,
-                void_reason=p.void_reason,
+        payments=[payment_out(p) for p in payments],
+        refunds=[
+            RefundOut(
+                id=r.id,
+                receipt_number=r.receipt_number,
+                payment_id=r.fee_payment_id,
+                payment_receipt_number=payment_receipt_number,
+                amount=money.quantize(r.amount),
+                refunded_at=r.refunded_at,
+                reason=r.reason,
             )
-            for p in payments
+            for r, payment_receipt_number in refund_rows
         ],
+        amount_refunded=money.quantize(sum(refunded.values(), Decimal(0))),
     )
 
 
@@ -401,10 +487,10 @@ def _replay(
     )
 
 
-def _key_reused() -> AppError:
+def _key_reused(what: str = "payment") -> AppError:
     return AppError(
-        "This Idempotency-Key was already used for a different payment. "
-        "Use a new key for a new payment.",
+        f"This Idempotency-Key was already used for a different {what}. "
+        f"Use a new key for a new {what}.",
         status_code=409,
         code="idempotency_key_reused",
     )
@@ -438,6 +524,12 @@ def void_payment(
         raise AppError("Payment not found.", status_code=404, code="not_found")
 
     if payment.voided_at is None:
+        if refunded_on_payment(db, payment.id) > 0:
+            raise AppError(
+                "A payment that has been refunded cannot be voided.",
+                status_code=409,
+                code="conflict",
+            )
         payment.voided_at = datetime.now(UTC)
         payment.voided_by = actor.id
         payment.void_reason = reason
@@ -460,6 +552,118 @@ def void_payment(
     return PaymentResult(
         payment=next(p for p in loaded.payments if p.id == payment.id), fee=loaded
     )
+
+
+def refund_payment(
+    db: Session,
+    actor: User,
+    fee_id: int,
+    payment_id: int,
+    data: RefundRequest,
+    idempotency_key: str,
+) -> tuple[RefundResult, bool]:
+    """Record money given back against a payment; returns `(result, created)`.
+
+    A refund is any amount up to what is left of its payment, with a reason, its own
+    number and an audit row. A voided payment cannot be refunded. The bill row is locked
+    first, as for payments and voids, so two refunds at once cannot together exceed the
+    payment. Repeating a request with the same `idempotency_key` (same administrator,
+    payment and amount) returns the refund already recorded and `False`; the same key
+    for anything else is a 409. The caller owns the transaction.
+    """
+    fee = db.execute(
+        select(FeeRecord)
+        .where(FeeRecord.id == fee_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    payment = (
+        None
+        if fee is None
+        else db.execute(
+            select(FeePayment)
+            .where(FeePayment.id == payment_id, FeePayment.fee_record_id == fee.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).scalar_one_or_none()
+    )
+    if fee is None or payment is None:
+        raise AppError("Payment not found.", status_code=404, code="not_found")
+
+    amount = money.quantize(data.amount)
+    earlier = db.execute(
+        select(FeeRefund).where(
+            FeeRefund.created_by == actor.id,
+            FeeRefund.idempotency_key == idempotency_key,
+        )
+    ).scalar_one_or_none()
+    if earlier is not None:
+        if (
+            earlier.fee_payment_id != payment.id
+            or money.quantize(earlier.amount) != amount
+        ):
+            raise _key_reused("refund")
+        return _refund_result(db, fee.id, earlier.id), False
+
+    if payment.voided_at is not None:
+        raise AppError(
+            "A voided payment cannot be refunded.", status_code=409, code="conflict"
+        )
+    already = money.quantize(refunded_on_payment(db, payment.id))
+    refundable = money.quantize(payment.amount) - already
+    if refundable <= 0:
+        raise _payment_error("This payment has already been refunded in full.")
+    if amount > refundable:
+        raise _payment_error(
+            f"Refund of {amount} exceeds the refundable amount of {refundable}."
+        )
+
+    refund = FeeRefund(
+        fee_payment_id=payment.id,
+        fee_record_id=fee.id,
+        amount=amount,
+        reason=data.reason,
+        receipt_number=next_refund_number(db),
+        created_by=actor.id,
+        idempotency_key=idempotency_key,
+    )
+    try:
+        # A savepoint, so a clash on the key can be answered without losing the
+        # caller's transaction.
+        with db.begin_nested():
+            db.add(refund)
+            db.flush()
+    except IntegrityError as error:
+        # Only a clash on the key means "already used". Anything else is the database
+        # refusing something the checks above should have caught: let it surface.
+        if "uq_fee_refunds_created_by_idempotency_key" not in str(error.orig):
+            raise
+        raise _key_reused("refund") from error
+    db.add(
+        AuditLog(
+            actor_user_id=actor.id,
+            action="fee.payment.refund",
+            entity_type="fee_refund",
+            entity_id=refund.id,
+            changes={
+                "fee_record_id": fee.id,
+                "fee_payment_id": payment.id,
+                "payment_receipt_number": payment.receipt_number,
+                "amount": str(amount),
+                "receipt_number": refund.receipt_number,
+                "reason": data.reason,
+            },
+        )
+    )
+    db.flush()
+    return _refund_result(db, fee.id, refund.id), True
+
+
+def _refund_result(db: Session, fee_id: int, refund_id: int) -> RefundResult:
+    loaded = load_fee(db, fee_id)
+    refund = next(r for r in loaded.refunds if r.id == refund_id)
+    payment = next(p for p in loaded.payments if p.id == refund.payment_id)
+    return RefundResult(refund=refund, payment=payment, fee=loaded)
 
 
 def _payment_error(message: str) -> AppError:

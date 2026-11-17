@@ -40,6 +40,7 @@ REVISIONS = [
     "0011",
     "0012",
     "0013",
+    "0014",
 ]
 
 pytestmark = pytest.mark.skipif(
@@ -113,7 +114,12 @@ def test_upgrade_head_on_clean_database(clean_engine):
         triggers = conn.execute(
             text("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
         ).scalars()
-        assert set(triggers) == {"audit_logs_append_only", "fee_payments_append_only"}
+        assert set(triggers) == {
+            "audit_logs_append_only",
+            "fee_payments_append_only",
+            "fee_refunds_append_only",
+            "fee_refunds_limit",
+        }
 
 
 def test_student_number_sequence_is_created_and_dropped(clean_engine):
@@ -348,12 +354,91 @@ def test_downgrade_refuses_while_voided_payments_exist(clean_engine):
     with pytest.raises(Exception, match="voided payments exist"):
         command.downgrade(config, "0012")
 
-    assert current_revision(clean_engine) == "0013"
+    assert current_revision(clean_engine) == "0014"
     with clean_engine.connect() as conn:
         assert conn.execute(
             text("SELECT voided_at IS NOT NULL FROM fee_payments WHERE id = :id"),
             {"id": payment_id},
         ).scalar()
+
+
+def add_a_refund(engine, payment_id: int) -> None:
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO fee_refunds (fee_payment_id, fee_record_id, amount, reason, "
+                "receipt_number, created_by) SELECT id, fee_record_id, 10, "
+                "'a long enough reason', 'REF-T-1', created_by "
+                "FROM fee_payments WHERE id = :id"
+            ),
+            {"id": payment_id},
+        )
+
+
+def test_payment_refunds_are_created_guarded_and_dropped(clean_engine):
+    config = alembic_config()
+    table = text("SELECT to_regclass('public.fee_refunds')")
+    sequence = text("SELECT to_regclass('public.fee_refund_number_seq')")
+    triggers = text(
+        "SELECT tgname FROM pg_trigger "
+        "WHERE tgrelid = 'fee_refunds'::regclass AND NOT tgisinternal ORDER BY tgname"
+    )
+    pair = text(
+        "SELECT conname FROM pg_constraint "
+        "WHERE conname = 'uq_fee_payments_id_fee_record_id'"
+    )
+    guard = text("SELECT pg_get_functiondef('fee_payments_guard'::regproc)")
+
+    command.upgrade(config, "head")
+    with clean_engine.connect() as conn:
+        assert conn.execute(table).scalar() == "fee_refunds"
+        assert conn.execute(sequence).scalar() == "fee_refund_number_seq"
+        assert conn.execute(triggers).scalars().all() == [
+            "fee_refunds_append_only",
+            "fee_refunds_limit",
+        ]
+        assert conn.execute(pair).scalars().all() == [
+            "uq_fee_payments_id_fee_record_id"
+        ]
+        assert "fee_refunds" in conn.execute(guard).scalar()
+
+    command.downgrade(config, "0013")
+    with clean_engine.connect() as conn:
+        assert conn.execute(table).scalar() is None
+        assert conn.execute(sequence).scalar() is None
+        assert conn.execute(pair).scalars().all() == []
+        # the payment guard is back to its revision 0013 form
+        assert "fee_refunds" not in conn.execute(guard).scalar()
+        assert "cannot be deleted" in conn.execute(guard).scalar()
+
+
+def test_downgrade_refuses_while_refunds_exist(clean_engine):
+    config = alembic_config()
+    command.upgrade(config, "head")
+    payment_id = seed_a_payment(clean_engine)
+    add_a_refund(clean_engine, payment_id)
+
+    with pytest.raises(Exception, match="refunds exist"):
+        command.downgrade(config, "0013")
+
+    assert current_revision(clean_engine) == "0014"
+    with clean_engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM fee_refunds")).scalar() == 1
+
+
+def test_downgrade_without_refunds_keeps_the_payment(clean_engine):
+    config = alembic_config()
+    command.upgrade(config, "head")
+    payment_id = seed_a_payment(clean_engine)
+
+    command.downgrade(config, "0013")
+
+    with clean_engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT amount, receipt_number FROM fee_payments WHERE id = :id"),
+            {"id": payment_id},
+        ).one()
+    assert (str(row.amount), row.receipt_number) == ("40.00", "RCP-T-1")
 
 
 def test_migrated_schema_matches_models(clean_engine):

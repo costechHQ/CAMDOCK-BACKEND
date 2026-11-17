@@ -15,6 +15,9 @@ from app.schemas.fees import (
     PaymentCreate,
     PaymentResult,
     Receipt,
+    RefundReceipt,
+    RefundRequest,
+    RefundResult,
     VoidRequest,
 )
 from app.services import fees as fee_service
@@ -154,3 +157,63 @@ def void_payment(
     result = fee_service.void_payment(db, admin, fee_id, payment_id, body.reason)
     db.commit()
     return result
+
+
+@router.post(
+    "/{fee_id}/payments/{payment_id}/refund",
+    status_code=201,
+    responses={
+        200: {
+            "model": RefundResult,
+            "description": "A retry with the same Idempotency-Key: the refund that was "
+            "already recorded, unchanged. Nothing new was created.",
+        },
+        404: {"description": "No such payment on that bill."},
+        409: {
+            "description": "The payment is voided, or the Idempotency-Key was already "
+            "used for a different payment or amount."
+        },
+        422: {
+            "description": "The amount is more than what is left of the payment, or "
+            "the reason or the Idempotency-Key is missing or invalid."
+        },
+    },
+)
+def refund_payment(
+    fee_id: int,
+    payment_id: int,
+    body: RefundRequest,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[Session, Depends(get_db)],
+    response: Response,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            pattern=r"^[A-Za-z0-9._-]{8,64}$",
+            description="Required. A unique value (8 to 64 letters, digits, `.`, `_` "
+            "or `-`) per refund. Send the same value when retrying so money is never "
+            "given back twice.",
+        ),
+    ],
+) -> RefundResult:
+    """Record money given back against a payment: any amount up to what is left of it,
+    with a reason. It gets its own REF- receipt number and reduces what counts as paid.
+    A voided payment cannot be refunded."""
+    result, created = fee_service.refund_payment(
+        db, admin, fee_id, payment_id, body, idempotency_key
+    )
+    db.commit()
+    if not created:
+        response.status_code = 200
+    return result
+
+
+@router.get("/{fee_id}/refunds/{refund_id}/receipt")
+def get_refund_receipt(
+    fee_id: int,
+    refund_id: int,
+    user: Annotated[User, Depends(require_roles("admin", "parent"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> RefundReceipt:
+    """Printable data for a refund; a parent only gets their own child's."""
+    return fee_service.refund_receipt(db, user, fee_id, refund_id)

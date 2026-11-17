@@ -17,6 +17,7 @@ from app.models.fees import FEE_TYPES
 from tests.test_averages import admin, admin_login, school  # noqa: F401
 from tests.test_dashboard_parent import parent_for
 from tests.test_fee_receipts import bill, pay
+from tests.test_payment_refund import refund
 from tests.test_payment_void import void
 
 FEES = "/api/v1/fees"
@@ -98,17 +99,30 @@ def assert_same_everywhere(api_client, admin, parent, school, expected):
         assert receipt["amount_paid"] == m(paid), f"bill receipt {fee_id}"
         assert receipt["balance"] == detail["balance"]
         assert receipt["status"] == detail["status"]
-        # each instalment's receipt shows the running total up to that instalment
+        # each instalment's receipt shows the running total up to that instalment:
+        # live payments so far, less the refunds given on them
+        refunds_on = {}
+        for given in detail["refunds"]:
+            refunds_on[given["payment_id"]] = refunds_on.get(
+                given["payment_id"], Decimal(0)
+            ) + Decimal(given["amount"])
+        assert receipt["refunds"] == detail["refunds"], f"bill receipt {fee_id}"
+        assert m(sum(refunds_on.values(), Decimal(0))) == detail["amount_refunded"]
         running = Decimal(0)
+        shown = []
         for payment in detail["payments"]:
             if payment["status"] == "valid":  # a voided payment never counts
-                running += Decimal(payment["amount"])
+                running += Decimal(payment["amount"]) - refunds_on.get(
+                    payment["id"], Decimal(0)
+                )
+                shown.append(payment["id"])
             one = api_client.get(
                 f"{FEES}/{fee_id}/payments/{payment['id']}/receipt", headers=admin
             ).json()
             assert one["amount_paid"] == m(running), f"receipt {payment['id']}"
             assert one["balance"] == m(Decimal(billed) - running)
             assert one["status"] == status_of(billed, running)
+            assert {r["payment_id"] for r in one["refunds"]} <= set(shown)
         assert running == Decimal(paid)
 
     # the list, its totals, and the status filter
@@ -231,6 +245,63 @@ def test_a_payment_after_a_void_is_counted_everywhere(
     assert_same_everywhere(api_client, admin, parent, school, expected)
 
 
+def test_every_surface_agrees_after_refunds(db, api_client, admin, school, parent):
+    expected = make_bills(api_client, admin, school)
+    _due, partial, settled, instalments, _mixed = list(expected)
+
+    def payments_of(fee_id):
+        return api_client.get(f"{FEES}/{fee_id}", headers=admin).json()["payments"]
+
+    # a fully paid bill gets part of its money back: paid -> partial
+    refund(api_client, admin, settled, payments_of(settled)[0]["id"], "150.50")
+    expected[settled] = ("600", "449.50")
+    # two partial refunds on one instalment, a third on another
+    inst = payments_of(instalments)
+    refund(api_client, admin, instalments, inst[1]["id"], "50")
+    refund(api_client, admin, instalments, inst[1]["id"], "100.25")
+    refund(api_client, admin, instalments, inst[2]["id"], "149.50")
+    expected[instalments] = ("1000", "200.25")
+    # the first payment of a partial bill is refunded in full: partial -> due
+    refund(api_client, admin, partial, payments_of(partial)[0]["id"], "400")
+    expected[partial] = ("1000", "0")
+
+    assert_same_everywhere(api_client, admin, parent, school, expected)
+
+
+def test_voids_and_refunds_together_agree_everywhere(
+    db, api_client, admin, school, parent
+):
+    expected = make_bills(api_client, admin, school)
+    _due, _partial, _settled, instalments, mixed = list(expected)
+
+    def payments_of(fee_id):
+        return api_client.get(f"{FEES}/{fee_id}", headers=admin).json()["payments"]
+
+    mix = payments_of(mixed)  # two payments of 250
+    void(api_client, admin, mixed, mix[0]["id"])
+    refund(api_client, admin, mixed, mix[1]["id"], "75")
+    expected[mixed] = ("1000", "175")
+    inst = payments_of(instalments)  # 100, 250.50, 149.50
+    void(api_client, admin, instalments, inst[0]["id"])
+    refund(api_client, admin, instalments, inst[2]["id"], "49.50")
+    expected[instalments] = ("1000", "350.50")
+
+    assert_same_everywhere(api_client, admin, parent, school, expected)
+
+
+def test_a_payment_after_a_refund_is_counted_everywhere(
+    db, api_client, admin, school, parent
+):
+    expected = make_bills(api_client, admin, school)
+    _due, _partial, settled, _instalments, _mixed = list(expected)
+    first = api_client.get(f"{FEES}/{settled}", headers=admin).json()["payments"][0]
+    refund(api_client, admin, settled, first["id"], "200")
+    pay(api_client, admin, settled, "100")
+    expected[settled] = ("600", "500")
+
+    assert_same_everywhere(api_client, admin, parent, school, expected)
+
+
 def test_an_empty_school_agrees_too(db, api_client, admin, school, parent):
     page = api_client.get(FEES, headers=admin).json()
 
@@ -298,7 +369,7 @@ def python_files():
 
 
 def test_only_the_paid_module_adds_up_payment_amounts():
-    column = re.compile(r"FeePayment\.amount\b")
+    column = re.compile(r"Fee(Payment|Refund)\.amount\b")
     python_sum = re.compile(r"sum\([^\n]*\.amount\b")
 
     offenders = []
@@ -317,5 +388,6 @@ def test_only_the_paid_module_adds_up_payment_amounts():
 def test_the_paid_module_is_where_the_sums_live():
     text = (APP / "services" / "paid.py").read_text(encoding="utf-8")
 
-    assert "func.sum(FeePayment.amount)" in text
-    assert text.count("func.sum(FeePayment.amount)") == 2  # per bill, and one bill
+    assert "func.sum(FeePayment.amount)" in text  # one bill
+    assert "func.sum(FeeRefund.amount)" in text  # refunds, per payment and per bill
+    assert "union_all(" in text  # many bills: payments less refunds, in one place

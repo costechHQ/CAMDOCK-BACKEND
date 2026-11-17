@@ -71,6 +71,10 @@ class FeeStudent(BaseModel):
 
 
 PaymentStatus = Literal["valid", "voided"]
+# Why a payment is voided or refunded: required, trimmed, short enough to print.
+Reason = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=5, max_length=200)
+]
 
 
 class PaymentOut(BaseModel):
@@ -83,6 +87,20 @@ class PaymentOut(BaseModel):
     status: PaymentStatus = "valid"
     voided_at: datetime | None = None
     void_reason: str | None = None
+    # Money given back on this payment, and what could still be refunded (0 once voided).
+    refunded_amount: Decimal = Decimal("0.00")
+    refundable_amount: Decimal = Decimal("0.00")
+
+
+class RefundOut(BaseModel):
+    id: int
+    receipt_number: str  # REF-<year>-<6 digits>
+    payment_id: int
+    payment_receipt_number: str
+    amount: Decimal  # two decimal places
+    refunded_at: datetime
+    # Only administrators are told why: null for everyone else.
+    reason: str | None = None
 
 
 FeeStatus = Literal["paid", "partial", "due"]
@@ -105,9 +123,12 @@ class FeeSummary(BaseModel):
 
 
 class FeeOut(FeeSummary):
-    """A bill with its instalments, oldest first."""
+    """A bill with its instalments and refunds, oldest first. `amount_paid` is live
+    payments less refunds; `amount_refunded` is the refunds alone."""
 
     payments: list[PaymentOut]
+    refunds: list[RefundOut] = []
+    amount_refunded: Decimal = Decimal("0.00")
 
 
 class FeeTotals(BaseModel):
@@ -140,9 +161,7 @@ class VoidRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    reason: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=5, max_length=200)
-    ]
+    reason: Reason
 
 
 class PaymentResult(BaseModel):
@@ -181,8 +200,42 @@ class Receipt(BaseModel):
     status: FeeStatus
     payment: PaymentOut | None = None
     payments: list[PaymentOut]
+    refunds: list[RefundOut] = []
     signatures: ReceiptSignatures
 
 
 class FeeTypes(BaseModel):
     items: list[str]
+
+
+class RefundRequest(BaseModel):
+    """Money to give back against a payment. The receipt number and date are server-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount: Amount
+    reason: Reason
+
+
+class RefundResult(BaseModel):
+    refund: RefundOut
+    payment: PaymentOut
+    fee: FeeOut
+
+
+class RefundReceipt(BaseModel):
+    """Printable data for a refund. The bill's figures are as they stand now."""
+
+    school: SchoolInfo
+    receipt_number: str
+    date: datetime
+    student: ReceiptStudent
+    term: TermRef
+    fee_type: str
+    refund: RefundOut
+    payment_receipt_number: str
+    amount_billed: Decimal  # two decimal places
+    amount_paid: Decimal
+    balance: Decimal
+    status: FeeStatus
+    signatures: ReceiptSignatures
