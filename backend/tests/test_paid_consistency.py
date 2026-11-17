@@ -106,7 +106,9 @@ def assert_same_everywhere(api_client, admin, parent, school, expected):
             refunds_on[given["payment_id"]] = refunds_on.get(
                 given["payment_id"], Decimal(0)
             ) + Decimal(given["amount"])
-        assert receipt["refunds"] == detail["refunds"], f"bill receipt {fee_id}"
+        # A printed receipt is the same refunds without the acting administrator.
+        shown = [{**r, "refunded_by": None} for r in detail["refunds"]]
+        assert receipt["refunds"] == shown, f"bill receipt {fee_id}"
         assert m(sum(refunds_on.values(), Decimal(0))) == detail["amount_refunded"]
         running = Decimal(0)
         shown = []

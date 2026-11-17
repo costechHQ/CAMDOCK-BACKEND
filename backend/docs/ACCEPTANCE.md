@@ -172,6 +172,35 @@ production stack:
   `0012` with every row intact, accepted the recovery command, and was downgraded back to
   `0011` cleanly (the new table disappeared and the data stayed).
 
+### Payment reversal checks (added in Phase 10)
+
+The scripted run also voids and refunds payments, filed under the fee criteria they
+belong to (the list of 33 does not change):
+
+- **Only administrators.** A teacher, a parent and an anonymous caller are refused (403,
+  403, 401) when they try to void or refund, and the bill is unchanged.
+- **Invalid amounts are rejected.** Refunds of 0, a negative, text, three decimals, or more
+  than the payment, a missing `Idempotency-Key` and a two-letter reason all give 422.
+- **Status and balance follow.** Refunding 300 of a fully paid 1000 bill leaves 700 paid,
+  300 owing and "partial"; refunding the rest makes it "due"; voiding a payment takes it
+  out of the totals but keeps it on record.
+- **No double refund.** The same key twice gives one refund (201 then 200); the same key
+  for a different amount gives 409; voiding a refunded payment and refunding a voided one
+  both give 409.
+- **Unique numbers.** Payment and `REF-` receipt numbers on a bill never repeat.
+- **Attributable.** The history lists each payment and refund with the administrator's
+  email. A parent sees the same events with no email and no reason, and no printed receipt
+  (bill, payment or refund) carries the email. Another family's refund receipt gives the
+  same 404 as an unknown one.
+
+Recorded against the application over HTTP with a clean Postgres 16 database (the same
+in-process run as `tests/test_acceptance_doc.py`, not the production Docker stack):
+`30 passed, 0 failed, 3 shown elsewhere (33 criteria, 252 requests)`. To prove these checks
+can fail, the API was broken three ways: a teacher allowed to refund (five criteria
+failed), parents shown who acted (one failed), and refund receipts carrying the
+administrator's email (one failed). Each was reverted afterwards. The two earlier recorded
+runs above were on the production stack at `0012`; this one was not repeated there.
+
 ### Proof for the criteria not shown by HTTP
 
 **Financial writes are attributable to an authenticated user.** Over HTTP the run shows
@@ -220,9 +249,10 @@ state in the database; the sign-in token is returned to the caller and sent back
 ## Not covered by Section 8
 
 These are known limits, not failures of a criterion. They are listed in
-[OPERATIONS.md](OPERATIONS.md#known-limits-of-this-version): no payment void or refund, no
-an email-based "forgot password" (a reset needs an administrator to hand over a code),
-in-memory rate limiting, and the undefined result-publication and term-locking rules.
+[OPERATIONS.md](OPERATIONS.md#known-limits-of-this-version): no email-based "forgot
+password" (a reset needs an administrator to hand over a code), in-memory rate limiting,
+no rule for reversing a payment from a closed term, and the undefined result-publication
+and term-locking rules.
 
 One observation from writing the run: the amount `"1e3"` is accepted as `1000.00`. Money
 is documented as a decimal string with at most two decimals, and the value is exact, so

@@ -161,10 +161,13 @@ names.
   them. This set-up runs one process, so that is simply how it works. Running several API
   processes or servers would give each its own counters (the allowance multiplies); a
   shared store such as Redis would be needed first.
-- **No payment void or refund.** A wrongly entered payment cannot be reversed in the
-  portal. Record the correction on paper and ask the developer for a supported fix;
-  do not edit `fee_payments` by hand, because the receipts and audit log would then
-  disagree.
+- **Reversing a payment is done in the portal, never in the database.** An administrator
+  voids a payment entered by mistake, or refunds money given back (see
+  [API_CONTRACT.md](API_CONTRACT.md)). Both keep the original entry, are audited, and cannot
+  be edited or deleted. Do not edit `fee_payments` or `fee_refunds` by hand: the receipts
+  and audit log would then disagree. A refund entered by mistake cannot be undone; record a
+  new payment for the same amount. There is no limit on how old a payment may be, because
+  the school has not set a rule for closed terms.
 - **Request bodies need a length.** A request sent in chunks without `Content-Length` is
   refused with 411. Ordinary browsers and tools send it.
 
@@ -190,7 +193,8 @@ These are not faults, but you should know them:
 
 1. There is no self-service "forgot password" by email: a reset always needs an
    administrator to hand over a code (email and SMS are out of the SRS scope).
-2. No payment void or refund.
+2. No rule yet for reversing a payment from a closed term, and the `REF-` refund receipt
+   wording is a proposal the school has not seen.
 3. In-memory rate limiting and sign-in blocking (see above).
 4. Receipt numbers (`RCP-YYYY-NNNNNN`) are a proposal the school has not confirmed.
 5. A receipt shows the student's current class, not the class at the time of payment.
